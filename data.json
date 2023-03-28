@@ -1,0 +1,475 @@
+{
+  "id_name_districts": {
+    "44893": "AMAZONAS",
+    "82487": "ANCASH",
+    "19237": "APURIMAC",
+    "64818": "AREQUIPA",
+    "62569": "AYACUCHO",
+    "16399": "CAJAMARCA",
+    "42659": "CALLAO",
+    "52797": "CA\u00d1ETE",
+    "56506": "CUSCO",
+    "91528": "DEL SANTA",
+    "62063": "HUANCAVELICA",
+    "67512": "HUANUCO",
+    "03044": "HUAURA",
+    "51128": "ICA",
+    "64687": "JUNIN",
+    "91928": "LA LIBERTAD",
+    "86610": "LAMBAYEQUE",
+    "94877": "LIMA",
+    "97439": "LIMA ESTE",
+    "66333": "LIMA NORTE",
+    "21830": "LIMA SUR",
+    "84835": "LORETO",
+    "08080": "MADRE DE DIOS",
+    "21976": "MOQUEGUA",
+    "79203": "PASCO",
+    "46630": "PIURA",
+    "35843": "PUNO",
+    "53264": "SAN MARTIN",
+    "51864": "SELVA CENTRAL",
+    "39246": "SULLANA",
+    "20397": "TACNA",
+    "57516": "TUMBES",
+    "97111": "UCAYALI",
+    "62885": "VENTANILLA - LIMA NOROESTE"
+  },
+  "id_instancias_dict": {
+    "44893": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "82487": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "19237": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "64818": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "62569": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "16399": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "42659": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "52797": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "56506": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "91528": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "62063": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "67512": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "03044": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "51128": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "64687": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "91928": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "86610": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "94877": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "97439": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "66333": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "21830": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "84835": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "08080": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "21976": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "79203": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "46630": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "35843": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "53264": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "51864": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "39246": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "20397": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "57516": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "97111": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    },
+    "62885": {
+      "63104": "JUZGADO DE PAZ LETRADO",
+      "67041": "JUZGADO ESPECIALIZADO",
+      "78737": "JUZGADO MIXTO",
+      "15220": "SALA SUPERIOR"
+    }
+  },
+  "tuple_id_specialized_dict": {
+    "44893-63104": 0,
+    "44893-67041": 1,
+    "44893-78737": 1,
+    "44893-15220": 1,
+    "82487-63104": 1,
+    "82487-67041": 1,
+    "82487-78737": 1,
+    "82487-15220": 1,
+    "19237-63104": 0,
+    "19237-67041": 1,
+    "19237-78737": 1,
+    "19237-15220": 2,
+    "64818-63104": 1,
+    "64818-67041": 3,
+    "64818-78737": 1,
+    "64818-15220": 1,
+    "62569-63104": 1,
+    "62569-67041": 4,
+    "62569-78737": 1,
+    "62569-15220": 5,
+    "16399-63104": 1,
+    "16399-67041": 1,
+    "16399-78737": 1,
+    "16399-15220": 1,
+    "42659-63104": 2,
+    "42659-67041": 1,
+    "42659-78737": 2,
+    "42659-15220": 1,
+    "52797-63104": 0,
+    "52797-67041": 6,
+    "52797-78737": 1,
+    "52797-15220": 1,
+    "56506-63104": 1,
+    "56506-67041": 1,
+    "56506-78737": 1,
+    "56506-15220": 1,
+    "91528-63104": 1,
+    "91528-67041": 1,
+    "91528-78737": 1,
+    "91528-15220": 1,
+    "62063-63104": 1,
+    "62063-67041": 1,
+    "62063-78737": 1,
+    "62063-15220": 1,
+    "67512-63104": 0,
+    "67512-67041": 1,
+    "67512-78737": 7,
+    "67512-15220": 7,
+    "03044-63104": 5,
+    "03044-67041": 1,
+    "03044-78737": 5,
+    "03044-15220": 2,
+    "51128-63104": 1,
+    "51128-67041": 1,
+    "51128-78737": 1,
+    "51128-15220": 1,
+    "64687-63104": 8,
+    "64687-67041": 9,
+    "64687-78737": 1,
+    "64687-15220": 9,
+    "91928-63104": 1,
+    "91928-67041": 5,
+    "91928-78737": 1,
+    "91928-15220": 1,
+    "86610-63104": 1,
+    "86610-67041": 9,
+    "86610-78737": 1,
+    "86610-15220": 10,
+    "94877-63104": 9,
+    "94877-67041": 5,
+    "94877-78737": 2,
+    "94877-15220": 5,
+    "97439-63104": 9,
+    "97439-67041": 1,
+    "97439-78737": 2,
+    "97439-15220": 2,
+    "66333-63104": 0,
+    "66333-67041": 1,
+    "66333-78737": 1,
+    "66333-15220": 1,
+    "21830-63104": 8,
+    "21830-67041": 1,
+    "21830-78737": 1,
+    "21830-15220": 11,
+    "84835-63104": 0,
+    "84835-67041": 7,
+    "84835-78737": 7,
+    "84835-15220": 7,
+    "08080-63104": 0,
+    "08080-67041": 1,
+    "08080-78737": 1,
+    "08080-15220": 1,
+    "21976-63104": 0,
+    "21976-67041": 12,
+    "21976-78737": 7,
+    "21976-15220": 7,
+    "79203-63104": 0,
+    "79203-67041": 1,
+    "79203-78737": 1,
+    "79203-15220": 1,
+    "46630-63104": 1,
+    "46630-67041": 5,
+    "46630-78737": 1,
+    "46630-15220": 5,
+    "35843-63104": 0,
+    "35843-67041": 6,
+    "35843-78737": 7,
+    "35843-15220": 7,
+    "53264-63104": 1,
+    "53264-67041": 7,
+    "53264-78737": 1,
+    "53264-15220": 7,
+    "51864-63104": 8,
+    "51864-67041": 9,
+    "51864-78737": 1,
+    "51864-15220": 9,
+    "39246-63104": 1,
+    "39246-67041": 1,
+    "39246-78737": 1,
+    "39246-15220": 1,
+    "20397-63104": 1,
+    "20397-67041": 9,
+    "20397-78737": 1,
+    "20397-15220": 9,
+    "57516-63104": 13,
+    "57516-67041": 7,
+    "57516-78737": 2,
+    "57516-15220": 7,
+    "97111-63104": 0,
+    "97111-67041": 1,
+    "97111-78737": 1,
+    "97111-15220": 1,
+    "62885-63104": 9,
+    "62885-67041": 1,
+    "62885-78737": 2,
+    "62885-15220": 2
+  },
+  "specialized_dict_list": [
+    {
+      "85459": "CIVIL",
+      "03601": "FAMILIA CIVIL",
+      "70801": "LABORAL"
+    },
+    {
+      "85459": "CIVIL",
+      "03601": "FAMILIA CIVIL",
+      "08528": "FAMILIA TUTELAR",
+      "70801": "LABORAL"
+    },
+    {
+      "85459": "CIVIL",
+      "84782": "COMERCIAL",
+      "74335": "CONTENCIOSO ADMINISTRATIVO",
+      "03601": "FAMILIA CIVIL",
+      "08528": "FAMILIA TUTELAR",
+      "70801": "LABORAL"
+    },
+    {
+      "85459": "CIVIL",
+      "68938": "DERECHO CONSTITUCIONAL",
+      "03601": "FAMILIA CIVIL",
+      "08528": "FAMILIA TUTELAR",
+      "70801": "LABORAL"
+    },
+    {
+      "85459": "CIVIL",
+      "74335": "CONTENCIOSO ADMINISTRATIVO",
+      "68938": "DERECHO CONSTITUCIONAL",
+      "03601": "FAMILIA CIVIL",
+      "08528": "FAMILIA TUTELAR",
+      "70801": "LABORAL"
+    },
+    {
+      "85459": "CIVIL",
+      "84782": "COMERCIAL",
+      "74335": "CONTENCIOSO ADMINISTRATIVO",
+      "68938": "DERECHO CONSTITUCIONAL",
+      "03601": "FAMILIA CIVIL",
+      "08528": "FAMILIA TUTELAR",
+      "70801": "LABORAL"
+    },
+    {
+      "85459": "CIVIL",
+      "03601": "FAMILIA CIVIL",
+      "08528": "FAMILIA TUTELAR"
+    },
+    {
+      "85459": "CIVIL",
+      "74335": "CONTENCIOSO ADMINISTRATIVO",
+      "03601": "FAMILIA CIVIL",
+      "08528": "FAMILIA TUTELAR",
+      "70801": "LABORAL"
+    },
+    {
+      "85459": "CIVIL",
+      "84782": "COMERCIAL",
+      "03601": "FAMILIA CIVIL",
+      "70801": "LABORAL"
+    },
+    {
+      "85459": "CIVIL",
+      "84782": "COMERCIAL",
+      "03601": "FAMILIA CIVIL",
+      "08528": "FAMILIA TUTELAR",
+      "70801": "LABORAL"
+    },
+    {
+      "85459": "CIVIL",
+      "84782": "COMERCIAL",
+      "68938": "DERECHO CONSTITUCIONAL",
+      "03601": "FAMILIA CIVIL",
+      "08528": "FAMILIA TUTELAR",
+      "70801": "LABORAL"
+    },
+    {
+      "85459": "CIVIL"
+    },
+    {
+      "03601": "FAMILIA CIVIL",
+      "08528": "FAMILIA TUTELAR",
+      "70801": "LABORAL"
+    },
+    {
+      "85459": "CIVIL",
+      "84782": "COMERCIAL",
+      "74335": "CONTENCIOSO ADMINISTRATIVO",
+      "03601": "FAMILIA CIVIL",
+      "70801": "LABORAL"
+    }
+  ]
+}

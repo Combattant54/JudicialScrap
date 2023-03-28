@@ -6,12 +6,9 @@ logger = logging.getLogger(__name__)
 from functools import partialmethod
 
 class Saver():
-    _COLUMNS = ["competition", "date", "Country", "City", "Category", "Name", "Rank", "Rank description", "Nationality", "Competition categories", "Other Prices / Award", "Additional information"]
-    _LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"]
-
-    FINALIST = 0
-    JURY = 1
-    PARTICIPANT = 2
+    ALPHABET = [
+        "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "w", "X", "Y", "Z",
+    ]
     
     def __init__(self, name, folders, columns_map) -> None:
         self.wb = Workbook()

@@ -1,11 +1,23 @@
-import argparse
-import logging
-import os
-from saver import Saver
+import argparse, logging, os
 
-ALPHABET = [
-    "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "w", "X", "Y", "Z",
-]
+from saver import Saver
+import scraper
+import urllib3
+
+PROXIES = [("127.0.0.1", 8080)]
+for proxy in PROXIES:
+    try:
+        #delay = ping.Ping('www.wikipedia.org', timeout=2000).do()
+        pass
+    except Exception as e:
+        print(e)
+        PROXIES.remove(proxy)
+    else:
+        #print("Delai to", proxy, "=", delay)
+        pass
+    
+urllib3.disable_warnings()
+
 
 COLUMNS = [
     "Distrito Judicial",
@@ -62,6 +74,8 @@ def main(mode="WARNING", logs_file=LOGS_FILE, save_file="result/output.xlxs"):
     logging.basicConfig(filename=LOGS_FILE, filemode="w", level=mode, format=FORMAT)
     
     saver = Saver(*os.path.split(save_file), COLUMNS_MAP)
+    scraper.init()
+    scraper.scrap(saver=saver)
     
 
 def get_args():

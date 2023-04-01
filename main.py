@@ -17,7 +17,9 @@ for proxy in PROXIES:
         pass
     
 urllib3.disable_warnings()
-
+ALPHABET = [
+    "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "w", "X", "Y", "Z",
+]
 
 COLUMNS = [
     "Distrito Judicial",

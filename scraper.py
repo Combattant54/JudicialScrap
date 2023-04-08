@@ -4,6 +4,7 @@ from selenium.webdriver import Edge, DesiredCapabilities
 from selenium.webdriver.edge.service import Service
 import requester
 import logging
+from sql_saver import SQLSaver
 
 PROXIES = {
     "http": "http://127.0.0.1:8080",
@@ -45,7 +46,7 @@ def init(proxy_addr="127.0.0.1:8080"):
 
     requester.init(URL, CAPTCHA_URL, PROXIES)
 
-def scrap(saver):
+def scrap(saver: SQLSaver, overwrite=False):
     if driver is None:
         logger.critical("This script havn't been initialized : exiting script")
         exit(1)
@@ -57,7 +58,21 @@ def scrap(saver):
     captcha = requester.get_captcha(driver)
     print("captcha :", captcha)
     
-    requester.get_instancias(driver)
+    r = requester.get_instancias(driver, overwrite)
+    
+    logger.info(str(r))
+    
+    saver.get_filtrer()
     
     #transformation en soupe de bs4 (pour la manipulation)
     soup = BeautifulSoup(driver.page_source, features="html.parser")
+    
+def get_iterator(driver, saver: SQLSaver):
+    saver.get_filtrer()
+
+
+def exit():
+    if driver is None:
+        return
+    
+    driver.quit()

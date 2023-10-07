@@ -1,23 +1,38 @@
 import requests
 from requests.exceptions import ProxyError
-from selenium.webdriver.remote.webdriver import WebDriver
+
+from selenium.webdriver.edge.webdriver import WebDriver
+
 from bs4 import BeautifulSoup
-from bs4.element import Tag
+from bs4.element import Tag, PageElement, NavigableString
+from functools import partial
+
 import logging
+import asyncio
+from asyncio import Queue
+from aiofiles import open as aopen
+from contextlib import asynccontextmanager
+
 import json
+
 from utils import get_cookies_dict
 
-logger = logging.getLogger(__name__)
+import build_logger
+logger = build_logger.get_logger(__name__)
+logger.setLevel(logging.INFO)
 
 URL = None
 CAPTCHA_URL = None
-PROXIES = {}
+PROXIES = {'http': 'http://127.0.0.1:8080', 'https': 'http://127.0.0.1:8080'}
+TOTAL_PROXIES_ERROR = 0
+TOTAL_PROXIES_GOOD = -100
 DATA_PATH = "data.json"
 DATA = {}
 CURRENT_YEAR = 2023
 
 CERT_PATH = "certificates/burp-suite-certificate.pem"
-SEARCH_URL = ""
+SEARCH_URL = "/cej/forms/busquedaform.html"
+GET_FORM_URL = "/cej/forms/detalleform.html"
 
 HEADERS = {
     "Host":"cej.pj.gob.pe",
@@ -30,48 +45,300 @@ PARAMS = {
     "Path": "/cej/xyhtml"
 }
 
+id = 0
+is_using_driver = False
+current_access_id = id
+ids_queue = Queue(256)
+cookies_queue = Queue(4)
+
+_initialized = False
+
 def init(base_url, captcha_url, proxies={}):
     global URL
     global CAPTCHA_URL
     global PROXIES
+    global DATA
+    global _initialized
     
     URL = str(base_url)
     CAPTCHA_URL = str(captcha_url)
+    for k, v in proxies.items():
+        if not k in PROXIES:
+            print(f"key {k} is not in both proxies")
+        elif v != PROXIES[k]:
+            print(f"key {k} has different value in the proxies dicts")
+            
     PROXIES  = dict(proxies)
+    print("\n")
     print(PROXIES)
+    print("")
+    
+    with open(DATA_PATH, "r") as f:
+        DATA = json.load(f)
 
-def send(req: requests.PreparedRequest, **kwargs) -> requests.Response:
-    if isinstance(req, requests.request):
+    _initialized = True
+
+def stop():
+    global _initialized
+    _initialized = False
+
+@asynccontextmanager
+async def get_lock():
+    try:
+        id = await get_id()
+        await lock(id)
+        yield id
+    finally:
+        pass
+
+@asynccontextmanager
+async def cookies_context():
+    try:
+        page, cookies = await get_cookies()
+        yield (page, cookies)
+    finally:
+        await release_cookies(cookies, page)
+
+async def get_id():
+    global id
+    id += 1
+    return id
+
+async def lock(id):
+    global is_using_driver
+    global current_access_id
+    
+    if not is_using_driver:
+        current_access_id = id
+        is_using_driver = True
+        return id
+    
+    await ids_queue.put(id)
+    while current_access_id != id:
+        await asyncio.sleep(0)
+
+async def release(id):
+    global current_access_id
+    global is_using_driver
+    
+    assert current_access_id == id
+    if ids_queue.empty():
+        is_using_driver = False
+        current_access_id = None
+        return
+    
+    current_access_id = await ids_queue.get()
+    
+
+async def send(req: requests.PreparedRequest, timeout=15, **kwargs) -> requests.Response:
+    global TOTAL_PROXIES_ERROR
+    global TOTAL_PROXIES_GOOD
+    
+    if isinstance(req, requests.Request):
         req = req.prepare()
     
+    loop = asyncio.get_event_loop()
+    
     with requests.Session() as sess:
-        try:
-            r = sess.send(req, PROXIES, verify=False, **kwargs)
-        except ProxyError:
-            r = sess.send(req, verify=False, **kwargs)
-            
+        if (TOTAL_PROXIES_GOOD + 2) * 2 > TOTAL_PROXIES_ERROR:
+            try:
+                r = await loop.run_in_executor(None, partial(sess.send, req, verify=False, proxies=PROXIES, timeout=timeout, **kwargs))
+                logger.debug("good send with proxy") 
+                TOTAL_PROXIES_GOOD += 1
+            except ProxyError as e:
+                logger.debug("error in proxy reason of " + str(e))
+                TOTAL_PROXIES_ERROR += 1
+                r = await loop.run_in_executor(None, partial(sess.send, req, verify=False, **kwargs))
+            except requests.ReadTimeout as e:
+                logger.warning("Timeout error : " + str(e))
+                r = None
+        else:
+            logger.debug("proxy isn't tried")
+            r = await loop.run_in_executor(None, partial(sess.send, req, verify=False, **kwargs))
     return r
 
-def get_captcha(driver: WebDriver) -> str:
-    COOKIES = get_cookies_dict(driver.get_cookies())
+async def get_captcha(cookies) -> str:
     
     #cré une requete avec les paramètres
-    req = requests.Request("GET", URL + "/cej/xyhtml", cookies=COOKIES, headers=HEADERS, params=PARAMS)
+    req = requests.Request("GET", URL + "/cej/xyhtml", cookies=cookies, headers=HEADERS, params=PARAMS)
     
     # Envoie la requete
-    r = send(req)
+    r = await send(req)
     
     # traite la réponse
+    if r is None:
+        raise AttributeError("None captcha")
     logger.debug(r.text)
     bal = BeautifulSoup(r.text, "html.parser")
     
     
     return str(bal.find("input").get("value"))
 
-def get_instancias(driver: WebDriver, overwrite=False):
+async def get_session(driver: WebDriver, force_unsafe = False):
+    if force_unsafe:
+        driver.delete_all_cookies()
+        driver.get(URL + SEARCH_URL)
+        cookies = get_cookies_dict(driver=driver)
+        page = driver.page_source
+        return page, cookies
+
+    async with get_lock() as id:
+        driver.delete_all_cookies()
+        driver.get(URL + SEARCH_URL)
+        cookies = get_cookies_dict(driver=driver)
+        page = driver.page_source
+    
+    return page, cookies
+
+def cookies_creator(driver: WebDriver):
+    logger.info("starting getting cookies")
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    is_full = False
+    while _initialized:
+        if not cookies_queue.full():
+            is_full = False
+            try:
+                page, cookies = loop.run_until_complete(get_session(driver=driver, force_unsafe=True))
+            except:
+                return
+            cookies_amount = cookies_queue.qsize()
+            loop.run_until_complete(cookies_queue.put((page, cookies)))
+            logger.debug(f"created cookies from {cookies_amount} to {cookies_queue.qsize()}")
+        elif not is_full:
+            logger.info("queue is full now")
+            is_full = True
+        
+async def get_cookies():
+    while cookies_queue.empty():
+        await asyncio.sleep(0)
+    cookies = cookies_queue.get_nowait()
+    return cookies
+
+async def release_cookies(cookies, page=None):
+    if cookies_queue.empty():
+        if page is None:
+            req = requests.Request("GET", URL + SEARCH_URL, cookies=cookies)
+            r = await send(req=req)
+            if not r.status_code in [200, 201, 202]:
+                return
+            
+            page = r.content
+        cookies_queue.put_nowait((page, cookies))
+    else:
+        logger.debug("no empty queue : dumping cookies")
+
+async def get_districts(page: str, cookies) -> dict[str, int]:
+    """Récupère tout les districts dans un dictionnaire
+
+    Args:
+        driver (WebDriver): le driver a prendre pour envoyer les données
+        
+    Returns:
+        Retourn un dictionnaire de la forme {"nom du district" : "id actuel du district"}
+    """
+    
+    soup = BeautifulSoup(page, "html.parser")
+    districts_list = soup.find(id="distritoJudicial")
+    
+    # dictionnaire de la forme 'nom du district':'id du district'
+    id_name_districts = {}
+    
+    for i, child in enumerate(districts_list.findChildren(name="option", onmouseover="")):
+        if not isinstance(child, Tag):
+            continue
+        
+        id = child.get("value")
+        district_name = child.text
+        id_name_districts[district_name] = id
+    
+    return id_name_districts
+
+async def get_instancias_for_district(cookies, district_code: int | str) -> dict:
+    """Un fonction qui 
+
+    Args:
+        driver (WebDriver): Le WebDriver qui pilote le scraping
+        district_code (int | str): l'id du district pour lequel on effectue la recherche
+
+    Returns:
+        dict: Retourn un dictionnaire de la forme {"nom de l'instance" : "id actuel de l'instance"}
+    """
+    url_distrito = URL + "/cej/forms/filtrarOrganosPorDistrito.html"
+    
+    data = {"codDistrito":district_code}
+    add_header = HEADERS.copy()
+    add_header.update({
+        "Origin": "https://cej.pj.gob.pe"
+    })
+    
+    req = requests.Request("POST", url=url_distrito, cookies=cookies, headers=add_header, data=data)
+    r = await send(req)
+    if r is None:
+        raise AttributeError("None response in instancias_for_district")
+    soup = BeautifulSoup(r.text, "html.parser")
+    instancias = {t.text:t.get("value") for t in soup.find_all("option")}
+    
+    return instancias
+
+async def get_specialized_per_district_and_instance(
+    cookies, 
+    district_code: int | str, 
+    instance_code: int | str
+    ) -> dict[str, int | str]:
+    """Une fonction qui retourne les spécialités
+
+    Args:
+        driver (WebDriver): Le driver qui pilote le scraping
+        district_code (int | str): Le code du district
+        instance_code (int | str): Le code de l'instance
+
+    Returns:
+        dict[str, int | str]: Retourn un dictionnaire de la forme {"nom de la spécialité" : "id actuel de la spécialité"}
+    """
+    
+    url_espece = URL + "/cej/forms/filtrarEspecPorOrgano.html"
+    
+    data = {
+        "codDistrito":district_code,
+        "codOrgano": instance_code
+    }
+    add_header = HEADERS.copy()
+    add_header.update({
+        "Origin": "https://cej.pj.gob.pe"
+    })
+    
+    req = requests.Request("POST", url=url_espece, cookies=cookies, headers=add_header, data=data)
+    r = await send(req)
+    
+    soup = BeautifulSoup(r.text, "html.parser")
+    
+    
+    # récupère les spécialités
+    specialized = {t.text:t.get("value") for t in soup.find_all("option")}
+    
+    return specialized
+    
+
+def get_instancias(cookies, overwrite=False):
     global DATA
-    with open(DATA_PATH, "r") as f:
-        DATA = json.loads(f.read(), object_hook=dict)
+    
+    raise Exception("Uncorrect function")
+    # Vérifie la validité du chemin des données et si nécéssaire, cré le fichier / initialize le fichier
+    # c'est uniquement pour sauvegarder les données dans un .json
+    try:
+        with open(DATA_PATH, "r") as f:
+            DATA = json.loads(f.read(), object_hook=dict)
+    except FileNotFoundError:
+        with open(DATA_PATH, "x") as f:
+            f.write("{}")
+            DATA = {} 
+    except json.JSONDecodeError:
+        with open(DATA_PATH, "w") as f:
+            f.write("{}")
+            DATA = {}
+    
+    # retourne les informations déja enregistré
+    # n'a pas lieu si les informations ne sont pas présentes ou que la réécriture est demandée dans 'overwrite'
     if not overwrite and "id_name_districts" in DATA and "id_instancias_dict" in DATA and "tuple_id_specialized_dict" in DATA and "specialized_dict_list" in DATA:
         id_name_districts = DATA["id_name_districts"]
         id_instancias_dict = DATA["id_instancias_dict"]
@@ -91,7 +358,7 @@ def get_instancias(driver: WebDriver, overwrite=False):
     
     url_distrito = URL + "/cej/forms/filtrarOrganosPorDistrito.html"
     url_espece = URL + "/cej/forms/filtrarEspecPorOrgano.html"
-    print(url_distrito)
+    # print(url_distrito)
     
     # dictionnaire de la forme 'nom du district':'id du district'
     id_name_districts = {}
@@ -105,7 +372,7 @@ def get_instancias(driver: WebDriver, overwrite=False):
     #liste de dictionnaire de la forme 'nom de la spécialité':'id de la spécialité'
     specialized_dict_list = []
     
-    for child in districts_list.findChildren(name="option", onmouseover=""):
+    for i, child in enumerate(districts_list.findChildren(name="option", onmouseover="")):
         if not isinstance(child, Tag):
             continue
         
@@ -124,7 +391,7 @@ def get_instancias(driver: WebDriver, overwrite=False):
         soup = BeautifulSoup(r.text, "html.parser")
         instancias = {t.text:t.get("value") for t in soup.find_all("option")}
         if instancias != id_instancias_dict:
-            print("different instancias : ", instancias, " to ", id_instancias_dict)
+            #print("different instancias : ", instancias, " to ", id_instancias_dict)
             id_instancias_dict = instancias.copy()
         
         
@@ -147,9 +414,12 @@ def get_instancias(driver: WebDriver, overwrite=False):
             
             tuple_id_specialized_dict[str(district_name)+"-"+str(k)] = specialized_dict_list.index(specialized)
         
-        print(specialized_dict_list)
+        print(i, " : ", len(specialized_dict_list))
+    
+    print("done looping over childs\n\n")
     with open(DATA_PATH, "w") as f:
-        data = {
+        #print(DATA, "\n"*2)
+        DATA = {
             "id_name_districts": id_name_districts,
             "id_instancias_dict": id_instancias_dict,
             "tuple_id_specialized_dict": tuple_id_specialized_dict,
@@ -170,42 +440,26 @@ def get_instancias(driver: WebDriver, overwrite=False):
 
 
 
-def validate(
-    driver: WebDriver, 
+async def validate(
+    cookies, 
     district: str|int, 
     instance: str|int, 
     specialized: str|int, 
     year: int, 
     n_expediente: int, 
-    captcha: str
+    captcha: str,
+    tries=3
     ):
     
-    districts_dict = DATA["id_name_districts"]
     instances_dict = DATA["id_instancias_dict"]
-    district_name = ""
-    instance_name = ""
-    
     
     #vérifie le district
     if district is None:
+        logger.warning("District is None")
         return False
-    elif isinstance(district, int):
-        val = False
-        for k, v in districts_dict.items():
-            if v == district:
-                district_name = k
-                district = v
-                val = True
-                break
-        if not val:
-            logger.warning("Invalid district id of " + str(district))
-            return False
-    else:
-        district_name = district
-        district = districts_dict.get(district, None)
-        if district is None:
-            logger.warning(district + " not found in data")
-            return False
+    elif not str(district).isalnum():
+        logger.warning(f"The district {district} is not alpha numeric")
+        return False
     
     
     #Vérifie l'instance
@@ -213,71 +467,33 @@ def validate(
         logger.warning("Invalid id for instancias_dict : " + str(district))
         return False
     if instance is None:
+        logger.warning("none instance")
         return False
-    elif isinstance(instance, int):
-        val = False
-        for k, v in instances_dict.items():
-            if instance == k:
-                instance_name = k
-                instance = v
-                val = True
-                break
-        if not val:
-            logger.warning("Invalid instance of id " + str(instance))
-            return False
-    else:
-        instance_name = instance
-        instance = instances_dict.get(instance, None)
-        if instance is None:
-            logger.warning(instance + " not found in instance dict of district " + districts_dict.get(district))
-            return False
-    
-    
-    # Définit la spécialité
-    specializeds_dicts = DATA["tuple_id_specialized_dict"]
-    specializeds_lists = DATA["specialized_dict_list"]
-    
-    specialized_key = str(district_name) + "-" + str(instance_name)
-    specialized_index = specializeds_dicts.get(specialized_key, {})
-    
-    if specialized_index is not None and specialized_index < len(specializeds_lists):
-        specialized_dict = specializeds_lists[specialized_index]
-    else:
-        logger.error(f"specialized_index of {specialized_key} is not found")
+    elif not str(instance).isalnum():
+        logger.warning("instance of " + str(instance) + " is not alpha numeric")
         return False
     
-    if specialized_dict is None:
-        logger.error(f"Index of {specialized_index} is not found or is unset")
-        return False
     
     if specialized is None:
+        logger.warning("none specialized")
         return False
     elif isinstance(specialized, int):
-        val = False
-        for k, v in specialized_dict.items():
-            if specialized == k:
-                specialized = int(v)
-                val = True
-                break
-        if not val:
-            logger.warning("Invalid specialized id at " + str(specialized))
-            return False
+        logger.warning("The string specialized of " + str(specialized) + " is not supported")
     else:
-        specialized = int(specialized_dict.get(specialized, None))
-        if specialized is None:
+        if not str(specialized).isalnum():
             logger.warning("Specialized not found for " + specialized)
     
     
     # Vérifie la validité de l'année 
     if year and year >= 1977 and year <= CURRENT_YEAR:
-        logger.info("Year " + str(year) + " is valid")
+        pass
     else:
         logger.warning("Year " + str(year) + " is not valid")
         return False
 
     # Vérifie la validité du n_expediente
     if n_expediente and n_expediente > 0:
-        logger.info("N_expediente " + str(n_expediente) + " is valid")
+        pass
     else:
         logger.warning("N_expediente " + str(n_expediente) + " is not valid")
         return False
@@ -291,7 +507,6 @@ def validate(
         captcha = captcha[4:]
     
     validate_url = URL + "/cej/forms/ValidarFiltros.htm"
-    cookies = driver.get_cookies()
     request_params = {
         "distritoJudicial": district,
         "organoJurisdiccional": instance,
@@ -303,14 +518,27 @@ def validate(
     }
     add_header = HEADERS.copy()
     req = requests.Request("POST", url=validate_url, cookies=cookies, headers=add_header, data=request_params)
-    r = send(req)
+    r = await send(req, timeout=45)
     
-    if r.text.strip().startswith("1"):
-        return True
+    if r is None:
+        logger.info("cant validate the filters")
+    
+    try:
+        code = r.text.strip()[0]
+        if code == "0" or code == "1":
+            return True
+        elif len(r.text.strip()) > 10 and tries > 0:
+            return await validate(cookies, district, instance, specialized, year, n_expediente, captcha, tries-1)
+        else:
+            logger.warning("get false from the server : " + r.text.strip())
+            return code
+    except Exception as e:
+        logger.info(type(r))
+        logger.info(str(e))
     
     
-def search(
-    driver:WebDriver, 
+async def search(
+    cookies, 
     district: str|int, 
     instance: str|int, 
     specialized: str|int, 
@@ -318,30 +546,234 @@ def search(
     n_expediente: int, 
     captcha: str =None,
     is_validate: bool =False
-    ) -> bool:
-    
+    ) -> requests.Response | None:
     
     # vérifie le captcha et les paramètres
     if captcha is None:
-        captcha = get_captcha(driver)
+        captcha = await get_captcha(cookies)
     
-    if not is_validate and not validate(driver, district, instance, specialized, year, n_expediente, captcha):
-        return False
-    
+    validate_result = await validate(cookies, district, instance, specialized, year, n_expediente, captcha)
+    if not is_validate and not validate_result:
+        return validate_result
     
     # Prépare la requete et les paramètres de celle-ci
-    cookies = get_cookies_dict(driver.get_cookies())    
     request_params = {
         "distritoJudicial": district,
         "organoJurisdiccional": instance,
         "especialidad": specialized,
         "anio": year,
         "numeroExpediente": n_expediente,
-        "codigoCaptcha": captcha,
-        "divKcha": 0
     }
     
-    req = requests.Request("GET", url=URL+SEARCH_URL, headers=HEADERS, cookies=cookies, data=request_params)
-    r = send(req)
+    req = requests.Request("POST", url=URL+SEARCH_URL, headers=HEADERS, cookies=cookies, data=request_params)
+    r = await send(req)
     
-    return True
+    return r
+
+async def compute_result(
+    cookies,
+    searched_page: requests.Response
+    ):
+    """Prend en paramètre le navigateur et la page de la recherche
+
+    Args:
+        driver (WebDriver): _description_
+        searched_page (requests.Response): _description_
+    """
+    if searched_page is None:
+        print("no searched page")
+        return None
+
+    soup = BeautifulSoup(searched_page.text, "html.parser")
+    content = soup.find("div", {"id": "divDetalles"})
+    ids = {}
+    
+    for i, child in enumerate(content.findChildren("form", {"id": "command", "action": "detalleform.html", "method": "post"})):
+        number = child.get("name", None)
+        if number is None:
+            continue
+        
+        ids[i] = int(number)
+    
+    logger.info(str(ids))
+    
+    forms = []
+    
+    coroutines = []
+    
+    for i, v in ids.items():
+        coroutines.append(handle_one_form_id(cookies, v))
+        
+    result_list = await asyncio.gather(*coroutines)
+    forms = [form for form in result_list if form is not None]
+    
+    return forms
+        
+async def handle_one_form_id(cookies, id, retry=True):
+    request_param = {
+        "nroRegistro":id
+    }
+    if cookies is None:
+        _, cookies = await get_cookies()
+    
+    req = requests.Request("POST", url=URL+GET_FORM_URL, headers=HEADERS, cookies=cookies, data=request_param)
+    r = await send(req)
+    
+    if r.status_code != 200:
+        logger.warning("status code of" + str(r.status_code))
+        return None
+    
+    try:
+        form = await get_one_form(text=r.text, id=id)
+    except AttributeError:
+        if retry:
+            return await handle_one_form_id(cookies=None, id=id, retry=False)
+        else:
+            raise
+    return form
+    
+
+async def get_one_form(text: str, id=None):
+    soup = BeautifulSoup(text, "html.parser")
+    
+    switch_dict = {
+        "Expediente N°:": "trial_id",
+        "Expediente NÂ°:": "trial_id",
+        "Órgano Jurisdiccional:": "organo",
+        "Ã“rgano Jurisdiccional:": "organo",
+        "Distrito Judicial:": "district",
+        "Juez:": "juez",
+        "Especialista Legal:": "legal_specialized",
+        "Fecha de Inicio:": "fecha de ignicio",
+        "Proceso:": "proceso",
+        "Observación:": "observation",
+        "ObservaciÃ³n:": "observation",
+        "Especialidad:": "specialized",
+        "Materia(s):": "materials",
+        "Estado:": "status",
+        "Etapa Procesal:": "step",
+        "Fecha Conclusión:": "fecha_conclusion",
+        "Fecha ConclusiÃ³n:": "fecha_conclusion",
+        "Ubicación:": "ubication",
+        "UbicaciÃ³n:": "ubication",
+        "Motivo Conclusión:": "motivo_conclusion",
+        "Motivo ConclusiÃ³n:": "motivo_conclusion",
+        "Sumilla:": "sumilla",
+        
+    }
+    
+    infos = {}
+    
+    # async with aopen(f"result/page{id}.html", "x") as f:
+    #     await f.write(text)
+    
+    #scrap le premier pannel
+    pannel_one_values = {}
+    pannel_one_children = soup.find("div", {"id": "collapseOneG"}).find("div", {"id": "gridRE"}).children
+        
+    for child in pannel_one_children:
+        if not isinstance(child, Tag):
+            continue
+        
+    
+        if "".join(list(child.get("class", None))) != "divRepExp":
+            logger.info(child.get("class", "Nothing"))
+            continue
+        
+        last = None
+        for content in child.children:
+            if not isinstance(content, Tag):
+                continue
+            content_class = "".join(list(content.get("class")))
+            # logger.info(content_class)
+            if content_class == "celdaGridN":
+                last = str(content.text)
+            elif last is not None and "celdaGrid" in content_class:
+                pannel_one_values[last] = str(content.text)
+                last = None
+    
+    for k, v in pannel_one_values.items():
+        value = v
+        value = value.replace("\n", "")
+        value = value.replace("\r", "")
+        value = value.replace("\t", "")
+        value = value.replace("\xa0", "")
+        values = [val for val in value.split("-") if val]
+        value = "-".join(values)
+        # value = value.replace("-", "")
+        value = value.replace("JUZ.", "JUZGADO")
+        infos[switch_dict.get(k, k)] = value
+            
+    # logger.info("infos : " + str(infos))
+    
+    pannel_two_switch = {
+        "Parte": "parte",
+        "Tipo de Persona": "tipo de Persona",
+        "Apellido Paterno / Razón Social": "apellido paterno",
+        "Apellido Materno": "apellido materno",
+        "Nombres": "nombres",
+    }
+    
+    #scrap le second pannel
+    pannel_two_categories = []
+    pannel_two_values = []
+    child_index = 0
+    for child in soup.find("div", {"id": "collapseTwo"}).find("div", {"class": "panelGrupo"}).children:
+        child_values = {}
+        if not isinstance(child, Tag):
+            continue
+        
+        
+        if child_index == 0:
+            for cat in child.children:
+                if not isinstance(child, Tag):
+                    continue
+                text = cat.get_text(" ").replace("\n", " ")
+                text = text.replace("\n", "")
+                text = text.replace("\t", "")
+                text = text.replace("\r", "")
+                if text == " ":
+                    continue
+                pannel_two_categories.append(pannel_two_switch.get(text, text))
+            
+            logger.debug("categories" + str(pannel_two_categories))
+            child_index += 1
+            continue
+        
+        child_class = child.get("class", "")
+        part = ""
+        info_index = 0
+        
+        for info in child.children:
+            if (not isinstance(info, Tag)) or (info is None):
+                continue
+            
+            if info is None:
+                continue
+            else:
+                logger.debug(info)
+                
+            value = info.get_text(" ")
+            info_class = " ".join(info.get("class", ""))
+            
+            child_values[pannel_two_categories[info_index]] = value
+            
+            info_index += 1
+        
+        pannel_two_values.append(child_values)
+        
+        child_index += 1
+    
+    # pannel_two_dict = dict(map(lambda x: list(zip(pannel_two_categories, x.keys())), pannel_two_values))
+    infos["personns"] = pannel_two_values
+
+    #scrap pannel three (descargar)
+    dowloads_list = soup.find("div", {"id": "collapseThree"}).find_all("a", {"class": "aDescarg"})
+    
+    if len(dowloads_list) > 0:
+        infos["descargar"] = True
+    else:
+        infos["descargar"] = False
+    
+    return infos
+        

@@ -3,7 +3,6 @@ from openpyxl.cell import Cell
 import os
 import logging
 logger = logging.getLogger(__name__)
-from functools import partialmethod
 
 class Saver():
     ALPHABET = [
@@ -35,7 +34,7 @@ class Saver():
         result = self.ws["A1:Z1"]
         for e in result[0]:
             assert isinstance(e, Cell)
-            print(e.coordinate, e.value)
+            #print(e.coordinate, e.value)
     
     def save_categorie(self, name):
         self.current_category = name

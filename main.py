@@ -5,13 +5,17 @@ import scraper
 import urllib3
 import traceback
 import sys
+import platform
 from sql_saver import SQLSaver
 import asyncio
 import keyboard
+import datetime
 
 import sqliteORM.logger_builder
 sqliteORM.logger_builder.set_level(logging.DEBUG)
 import build_logger
+import api
+import signal
 
 PROXIES = [("127.0.0.1", 8080)]
 for proxy in PROXIES:
@@ -83,6 +87,7 @@ async def main(mode="INFO", logs_file=LOGS_FILE, save_file="result/output.xlxs",
             pass
     
     build_logger.set_level(mode)
+    logger = build_logger.get_logger(__name__)
     
     # cré le saver
     if kwargs.get("sql_saver", False):
@@ -96,37 +101,68 @@ async def main(mode="INFO", logs_file=LOGS_FILE, save_file="result/output.xlxs",
     # lance le scraping
     try:
         scraper.init(**kwargs)
-        task = asyncio.create_task(scraper.scrap(saver=saver, overwrite=overwrite, **kwargs))
-        MAIN_TASK = task
-        await task
+        api.start()
+        scraper_task = asyncio.create_task(scraper.scrap(saver=saver, overwrite=overwrite, **kwargs))
+        starting_time = datetime.datetime.now()
+        MAIN_TASK = scraper_task
+        await asyncio.sleep(2)
+        logger.critical(api.get_json())
+        logger.info("starting_time :", starting_time)
+        
+        await MAIN_TASK
     except Exception as e:
-        traceback.print_exc()
+        for ligne in traceback.format_exception():
+            logger.error(ligne)
+        logger.exception("Getting an exception : " + str(e))
     finally:
-        print("exiting")
+        logger.critical(api.get_json())
+        ending_time = datetime.datetime.now()
+        running_time = ending_time - starting_time
+        logger.critical("starting_time :", starting_time)
+        logger.critical("ending_time :", ending_time)
+        logger.critical("exiting after running_time : ", running_time)
         try:
             MAIN_TASK.cancel()
         except:
-            print("Can't cancell the task " + str(MAIN_TASK))
+            logger.warning("Can't cancell the task " + str(MAIN_TASK))
         exit()
-        print("exit system")
-        sys.exit()
+        logger.critical("exit system")
+        sys.exit(4)
 
 def exit():
+    traceback.print_stack(limit=15)
     global stop
+    logger = build_logger.get_logger(__name__)
     try:
         stop = True
         try:
             MAIN_TASK.cancel()
         except:
-            print("Can't cancell the task " + str(MAIN_TASK))
+            logger.warning("Can't cancell the task " + str(MAIN_TASK))
         scraper.stop()
+        api.stop()
     except:
         pass
     finally:
-        os.system("taskkill /IM python.exe /F")
+        if platform.system() == "Windows":
+            os.system("taskkill /IM python.exe /F")
+        else:
+            logger.info("pkill running")
+            os.system("pkill -e -c -f python.exe; pkill -e -c -f python3.9; pkill -e -c -f bash")
+            logger.info("kill running")
+            os.system("kill -9 $(pidof python3.9); echo 'first kill done'; kill -9 $(pidof java)")
+            logger.info("os.kill running")
+            os.kill(os.getpid(), signal.SIGKILL)
 
 def get_args():
     parser = argparse.ArgumentParser(description=DESCRIPTION)
+    help_years = "All scraped years, one by one separated by ';' (1997;1998;2023) or in range separated by '-' (2007-2017;2020)"
+    help_years += f", valid years are in range {1977}-{datetime.date.today().year}"
+    parser.add_argument("years", type=str, help=help_years)
+    parser.add_argument("districts", type=str, help="All disctricts scraped")
+    parser.add_argument("instances", type=str, help="All instances scraped")
+    parser.add_argument("specialized", type=str, help="All specialized scraped")
+    
     parser.add_argument("-o", "--output", type=str, default="result/output.xlxs", help="Le fichier de sortie du document")
     
     #parser.add_argument("-m", "--mode", type=str, default="WARNING", choices=logging.getLevelNamesMapping().keys(), help="Le niveau a partir duquel les messages vont être loggés")

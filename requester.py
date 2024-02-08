@@ -14,6 +14,8 @@ from aiofiles import open as aopen
 from contextlib import asynccontextmanager
 
 import json
+import typing
+import time
 
 from utils import get_cookies_dict
 
@@ -26,7 +28,7 @@ CAPTCHA_URL = None
 PROXIES = {'http': 'http://127.0.0.1:8080', 'https': 'http://127.0.0.1:8080'}
 TOTAL_PROXIES_ERROR = 0
 TOTAL_PROXIES_GOOD = -100
-DATA_PATH = "data.json"
+DATA_PATH = "result/data.json"
 DATA = {}
 CURRENT_YEAR = 2023
 
@@ -130,7 +132,7 @@ async def release(id):
     current_access_id = await ids_queue.get()
     
 
-async def send(req: requests.PreparedRequest, timeout=15, **kwargs) -> requests.Response:
+async def send(req: requests.PreparedRequest, timeout=15, reconnection_amount=3, **kwargs) -> requests.Response:
     global TOTAL_PROXIES_ERROR
     global TOTAL_PROXIES_GOOD
     
@@ -153,8 +155,15 @@ async def send(req: requests.PreparedRequest, timeout=15, **kwargs) -> requests.
                 logger.warning("Timeout error : " + str(e))
                 r = None
         else:
-            logger.debug("proxy isn't tried")
-            r = await loop.run_in_executor(None, partial(sess.send, req, verify=False, **kwargs))
+            try:
+                r = await loop.run_in_executor(None, partial(sess.send, req, verify=False, **kwargs))
+            except requests.exceptions.ConnectionError as e:
+                if reconnection_amount <= 0:
+                    return None
+                logger.warning(f"connection error in request : {req.path_url}-{req.url}-{req.headers}")
+                logger.warning(e)
+                time.sleep(5)
+                return await send(req, timeout=timeout, reconnection_amount=reconnection_amount-1, **kwargs)
     return r
 
 async def get_captcha(cookies) -> str:
@@ -203,9 +212,7 @@ def cookies_creator(driver: WebDriver):
                 return
             cookies_amount = cookies_queue.qsize()
             loop.run_until_complete(cookies_queue.put((page, cookies)))
-            logger.debug(f"created cookies from {cookies_amount} to {cookies_queue.qsize()}")
         elif not is_full:
-            logger.info("queue is full now")
             is_full = True
         
 async def get_cookies():
@@ -227,7 +234,7 @@ async def release_cookies(cookies, page=None):
     else:
         logger.debug("no empty queue : dumping cookies")
 
-async def get_districts(page: str, cookies) -> dict[str, int]:
+async def get_districts(page: str, cookies) -> typing.Dict[str, int]:
     """Récupère tout les districts dans un dictionnaire
 
     Args:
@@ -253,7 +260,7 @@ async def get_districts(page: str, cookies) -> dict[str, int]:
     
     return id_name_districts
 
-async def get_instancias_for_district(cookies, district_code: int | str) -> dict:
+async def get_instancias_for_district(cookies, district_code: (int, str)) -> dict:
     """Un fonction qui 
 
     Args:
@@ -282,9 +289,9 @@ async def get_instancias_for_district(cookies, district_code: int | str) -> dict
 
 async def get_specialized_per_district_and_instance(
     cookies, 
-    district_code: int | str, 
-    instance_code: int | str
-    ) -> dict[str, int | str]:
+    district_code: (int, str), 
+    instance_code: (int, str)
+    ) -> typing.Dict[str, typing.Any]:
     """Une fonction qui retourne les spécialités
 
     Args:
@@ -293,7 +300,7 @@ async def get_specialized_per_district_and_instance(
         instance_code (int | str): Le code de l'instance
 
     Returns:
-        dict[str, int | str]: Retourn un dictionnaire de la forme {"nom de la spécialité" : "id actuel de la spécialité"}
+        typing.Dict[str, int | str]: Retourn un dictionnaire de la forme {"nom de la spécialité" : "id actuel de la spécialité"}
     """
     
     url_espece = URL + "/cej/forms/filtrarEspecPorOrgano.html"
@@ -442,14 +449,17 @@ def get_instancias(cookies, overwrite=False):
 
 async def validate(
     cookies, 
-    district: str|int, 
-    instance: str|int, 
-    specialized: str|int, 
+    district: (str, int), 
+    instance: (str, int), 
+    specialized: (str, int), 
     year: int, 
     n_expediente: int, 
     captcha: str,
     tries=3
     ):
+    
+    if tries < 0:
+        return False
     
     instances_dict = DATA["id_instancias_dict"]
     
@@ -530,7 +540,7 @@ async def validate(
         elif len(r.text.strip()) > 10 and tries > 0:
             return await validate(cookies, district, instance, specialized, year, n_expediente, captcha, tries-1)
         else:
-            logger.warning("get false from the server : " + r.text.strip())
+            logger.warning("get false from the server : " + r.text.strip().splitlines()[0])
             return code
     except Exception as e:
         logger.info(type(r))
@@ -539,14 +549,14 @@ async def validate(
     
 async def search(
     cookies, 
-    district: str|int, 
-    instance: str|int, 
-    specialized: str|int, 
+    district: (str, int), 
+    instance: (str, int), 
+    specialized: (str, int), 
     year: int, 
     n_expediente: int, 
     captcha: str =None,
     is_validate: bool =False
-    ) -> requests.Response | None:
+    ) -> (requests.Response, None):
     
     # vérifie le captcha et les paramètres
     if captcha is None:
@@ -574,7 +584,9 @@ async def compute_result(
     cookies,
     searched_page: requests.Response
     ):
-    """Prend en paramètre le navigateur et la page de la recherche
+    """
+    Retourne tout les formulaires sur la page demandée
+    Prend en paramètre le navigateur et la page de la recherche
 
     Args:
         driver (WebDriver): _description_
@@ -588,6 +600,12 @@ async def compute_result(
     content = soup.find("div", {"id": "divDetalles"})
     ids = {}
     
+    if content is None:
+        logger.error("No div with id 'divDetalles' found, the script raise an error if continue")
+        logger.error(searched_page)
+        logger.error(searched_page.text)
+        return None
+    
     for i, child in enumerate(content.findChildren("form", {"id": "command", "action": "detalleform.html", "method": "post"})):
         number = child.get("name", None)
         if number is None:
@@ -595,7 +613,6 @@ async def compute_result(
         
         ids[i] = int(number)
     
-    logger.info(str(ids))
     
     forms = []
     

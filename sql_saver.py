@@ -1,7 +1,8 @@
 import json
-import sqlite3
+import typing
 from typing import Iterable
 from bs4 import BeautifulSoup
+import datetime
 
 import asyncio
 import requests
@@ -164,10 +165,11 @@ class SQLSaver(Saver):
         
         self.name = name
         self.path = os.path.join(self.db_folder, self.name)
+        print(self.path)
         self.db = db.DB(path=self.path, debug=debug)
         self.debug = debug
         
-    def get_int_from_combinaison(self, specialized_map: dict[int, bool]):
+    def get_int_from_combinaison(self, specialized_map: typing.Dict[int, bool]):
         # Récupère les spécialités
         c = """SELECT * FROM Specialized ORDER BY id"""
         result = self.execute(c).fetchall()
@@ -345,22 +347,19 @@ class SQLSaver(Saver):
         soup = BeautifulSoup(page.text, "html.parser")
             
     def commit(self, msg=""):
-        conn = self.get_conn()
+        conn = self.db.get_conn()
         if not msg:
             msg = conn.total_changes
         if conn.total_changes > 0:
+            logger.debug("commiting for : " + str(msg))
             conn.commit()
-            print("commiting for : " + str(msg))
-            logger.info("Commiting for : " + str(msg))
 
-    async def save_informations(self, informations: dict | list, district_name="", instance_name="", specialized_name="", ):
+    async def save_informations(self, informations: (dict, list), district_name="", instance_name="", specialized_name="", ):
         if isinstance(informations, list):
             print("saving informations of type : " + type(informations))
             for info in informations:
                 await self.save_informations(info)
             return
-        
-        logger.debug(f"starting saving info (with descargar {informations.get('descargar', False)}) : {informations} ")
         
         # l'identifiant
         n_expediente, year, digit_one, digit_two, code_one, code_two, last_digit = informations["trial_id"].split("-")
@@ -377,7 +376,6 @@ class SQLSaver(Saver):
         record_id_string = f"n°{n_expediente}-{year}-{digit_one}-{digit_two}-{code_one}-{code_two}-{last_digit}"
         record_additional_string = f"{fecha_ignicio}-{descargar_value}-{informations.get('organo', '')}-{informations.get('materials', '')}"
         record_id_string = record_id_string + " / " + record_additional_string
-        logger.debug(f"saving record " + record_id_string)
         
         # l'instance
         instance = Instances.get_by(name=instance_name)
@@ -409,7 +407,6 @@ class SQLSaver(Saver):
         if juez is None:
             juez = Personns(name=juez_name)
             juez.create_new()
-        logger.info(juez)
         juez_id = juez.id
         
         # psécialité légale
@@ -461,7 +458,10 @@ class SQLSaver(Saver):
             conclusion = Fecha_conclusion(value=conclusion_name)
             conclusion.create_new()
         conclusion_id = conclusion.id
-        logger.info(str(conclusion.value))
+        
+        # TODO : vérifier que les conclusions sont bien None à chaque fois
+        if str(conclusion.value) != "" and str(conclusion.value) != " ":
+            logger.info("Conclusion : " + str(conclusion.value))
         
         # il y a peut etre informations["ubication"] qui correspond à 'Ubicación'
         
@@ -501,12 +501,12 @@ class SQLSaver(Saver):
             "descargar": descargar_value
         }
         
-        logger.info(datas_dict)
-        
         record = Records.get_by(**datas_dict)
         
         if record is not None:
             logger.debug(f"record already saved : {record_id_string} not saving a second time")
+            with open("errored.txt", "a") as f:
+                f.write(f"{datetime.datetime.now()} - record already saved : {record_id_string} not saving a second time\n")
             return
         
         record = Records(
@@ -583,11 +583,11 @@ class SQLSaver(Saver):
                 )
                 personn_record.create_new()
         
-        logger.debug("record " + record_id_string + " saved")
-        print("record " + record_id_string + " saved")
+        # logger.debug("record " + record_id_string + " saved")
+        # print("record " + record_id_string + " saved")
 
     async def compute_informations(self, informations, district_name, instance_name, specialized_name):
-        print("computing informations : " + str(len(informations)))
+        # print("computing informations : " + str(len(informations)))
         for info in informations:
             try:
                 async with DBLock:
@@ -599,8 +599,7 @@ class SQLSaver(Saver):
                     )
             except:
                 logger.exception("Error during saving informations : " + str(info))
-        self.db.commit("adding records")
-        logger.debug("saved datas")
+        self.commit("adding records")
         
 def test():
     saver = SQLSaver("db", "result")

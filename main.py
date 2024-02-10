@@ -90,13 +90,9 @@ async def main(mode="INFO", logs_file=LOGS_FILE, save_file="result/output.xlxs",
     logger = build_logger.get_logger(__name__)
     
     # cré le saver
-    if kwargs.get("sql_saver", False):
-        path, name = os.path.split(save_file)
-        name = "db.db"
-        saver = SQLSaver(name, path, COLUMNS_MAP)
-        await saver.create_tables()
-    else:
-        saver = Saver(*os.path.split(save_file), COLUMNS_MAP)
+    path, name = os.path.split(save_file)
+    name = "db.db"
+    saver = (path, name, COLUMNS_MAP)
     
     # lance le scraping
     try:
@@ -172,7 +168,6 @@ def get_args():
     
     parser.add_argument("--overwrite", action="store_true", help="Si présent, réécrit le fichier data.json")
     
-    parser.add_argument("--sql_saver", action="store_true", help="Si présent, utilise le saver SQLsaver (expérimental)")
     parser.add_argument("--just_init", action="store_true", help="Si présent, initialise les scripts sans lancer le scraping")
     
     return parser.parse_args()

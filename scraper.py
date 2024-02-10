@@ -2,7 +2,7 @@ import json
 import asyncio
 import threading
 import datetime
-import typing
+from .sql_saver import SQLSaver
 
 from webdriver import get_driver
 
@@ -89,6 +89,11 @@ def init(proxy_addr="127.0.0.1:8080", **kwargs):
     driver = get_driver(proxy_addr=proxy_addr)
 
     initialized = True
+
+async def get_saver(path, year, columns_map) -> SQLSaver:
+    saver = SQLSaver(f"db_{year}.db", path, columns_map)
+    await saver.create_tables()
+    return saver
 
 async def scrap_n_expediente(saver: SQLSaver, year, district_name, instance_name, specialized_name, n_expediente, tries=3):
     if isStopped or tries < 0:
@@ -338,12 +343,12 @@ async def scrap_year(saver, year):
     
     return errored
 
-async def scrap(saver: SQLSaver, overwrite=False, just_init=False, **kwargs):
+async def scrap(saver: tuple, overwrite=False, just_init=False, **kwargs):
     if not initialized:
         logger.critical("This script havn't been initialized : exiting script")
         return
     
-    
+    path, name, columns_map = saver
     
     # SETTING SCRAPING PARAMETERS !
 
@@ -428,6 +433,7 @@ async def scrap(saver: SQLSaver, overwrite=False, just_init=False, **kwargs):
     tasks = []
     errors_list = []
     for year in YEARS:
+        saver = await get_saver(path, year, columns_map)
         print("awaiting year " + str(year))
         err = await scrap_year(saver, year)
         print("years awaited, errors are : " + str(err))

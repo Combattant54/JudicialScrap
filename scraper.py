@@ -1,15 +1,15 @@
 import json
 import asyncio
-import threading
+import threading, traceback, sys
 import datetime
-from .sql_saver import SQLSaver
+from sql_saver import SQLSaver
+from decorates import raise_log_exception
 
 from webdriver import get_driver
 
 with open("errored.txt", "w"):
     pass
 
-from sql_saver import SQLSaver
 import requester
 from datetime import date
 
@@ -59,7 +59,7 @@ page_scraped = 0
 
 DIRECT_SAVER = False
 SYNCRONOUS_AMOUNT = 10
-BREAKS_AMOUNT = 20
+BREAKS_AMOUNT = 10
 
 # driver = None
 initialized = False
@@ -99,11 +99,16 @@ async def scrap_n_expediente(saver: SQLSaver, year, district_name, instance_name
     if isStopped or tries < 0:
         return False
     
-    logger.debug(f"scraping {year} {district_name} {instance_name} {specialized_name} {n_expediente}")
+    saved, issues = await saver.check_page(year, district_name, instance_name, specialized_name, n_expediente)
+    if saved:
+        logger.info("page of n : " + str(n_expediente) + "is saved")
+        return issues
+    
+    # logger.debug(f"scraping {year} {district_name} {instance_name} {specialized_name} {n_expediente}")
     forms_infos = None
     
     async with requester.cookies_context() as (page, cookies):
-    
+        # logger.debug("cookies get")
         districts = await requester.get_districts(page, cookies)
         district_code = districts.get(district_name)
         if district_code is None:
@@ -140,12 +145,14 @@ async def scrap_n_expediente(saver: SQLSaver, year, district_name, instance_name
             logger.warning(f"No data ({r}) get for {district_name}:{district_code} {instance_name}:{instance_code} {specialized_name}:{specialized_code} {year} {n_expediente}")
             return 2
         else:
-            forms_infos = await requester.compute_result(cookies, searched_page=r)
+            # logger.debug("search get, starting computing result")
+            forms_infos, all_saved = await requester.compute_result(cookies, searched_page=r)
     
     if forms_infos is None or not forms_infos:
         if tries > 0:
             return await scrap_n_expediente(saver, year, district_name, instance_name, specialized_name, n_expediente, tries-1)
         code = f"{district_name}:{instance_name}:{specialized_name}:{year}:{n_expediente}"
+        # logger.debug("Error during getting forms infos (max tries reach) {}".format(code))
         with open("errored.txt", "a") as f:
             f.write(f"{datetime.datetime.now()} - error during getting forms infos (max tries reach) {code}\n")
         return False
@@ -154,7 +161,7 @@ async def scrap_n_expediente(saver: SQLSaver, year, district_name, instance_name
     # print(forms_infos)
     
     # print(f"computing datas for {district_name}:{instance_name}:{specialized_name}:{year}:{n_expediente}")
-    await saver.compute_informations(forms_infos, district_name=district_name, instance_name=instance_name, specialized_name=specialized_name)
+    await saver.compute_informations(forms_infos, district_name=district_name, instance_name=instance_name, specialized_name=specialized_name, all_saved=all_saved)
     
     return True
     
@@ -164,6 +171,8 @@ async def scrap_specialized(saver, year, district_name, instance_name, specializ
         return
     
     global page_scraped
+    
+    logger.debug("Starting specialized " + str(specialized_name))
     
     scraping_specialized.add(specialized_name)
     
@@ -183,7 +192,14 @@ async def scrap_specialized(saver, year, district_name, instance_name, specializ
                 logger.info("adding for n_expediente = " + str(i))
                 coroutines.append(scrap_n_expediente(saver, year, district_name, instance_name, specialized_name, i))
             
-            results = await asyncio.gather(*coroutines)
+            try:
+                results = await asyncio.gather(*coroutines)
+            except Exception as e:
+                extyp, value, tb = sys.exc_info()
+                strings = traceback.format_exception(extyp, value, tb, limit=8)
+                logger.critical(e)
+                for s in strings:
+                    logger.critical(s)
             
             scraping_n_expedientes.difference_update(n_expedientes)
             scraped_n_expedientes.update(n_expedientes)
@@ -214,6 +230,11 @@ async def scrap_specialized(saver, year, district_name, instance_name, specializ
                 current_str = f"{year}:{district_name}:{instance_name}:{specialized_name}:{current_n_expediente}"
                 logger.exception(f"an unhandled exception occured when scraping " + current_str)
                 r = None
+        except Exception as e:
+            extype, value, tb = sys.exc_info()
+            logger.critical("Unknow exception at nexpedient " + str(current_n_expediente))
+            logger.critical("\n".join(traceback.format_exception(extype, value, tb, limit=8)))
+            r = None
         scraping_n_expedientes.remove(current_n_expediente)
         
         if r:
@@ -343,6 +364,7 @@ async def scrap_year(saver, year):
     
     return errored
 
+@raise_log_exception(limit=10)
 async def scrap(saver: tuple, overwrite=False, just_init=False, **kwargs):
     if not initialized:
         logger.critical("This script havn't been initialized : exiting script")
@@ -427,16 +449,18 @@ async def scrap(saver: tuple, overwrite=False, just_init=False, **kwargs):
     
     if just_init:
         print("exiting after a just init, may be an exception")
+        logger.critical("exiting after a just init, may be an exception")
         stop()
         return
     
-    tasks = []
     errors_list = []
     for year in YEARS:
         saver = await get_saver(path, year, columns_map)
         print("awaiting year " + str(year))
+        logger.debug("awaiting year " + str(year))
         err = await scrap_year(saver, year)
         print("years awaited, errors are : " + str(err))
+        logger.debug("years awaited, errors are : " + str(err))
         errors_list.append(err)
     # unworking code : the target server return false
     # errors_list = await asyncio.gather(*tasks)
@@ -447,7 +471,7 @@ async def scrap(saver: tuple, overwrite=False, just_init=False, **kwargs):
         if errors is None:
             continue
         errored.extend(errors)
-        with open("errored.txt", "a") as f:
+        with open("logs/errored.txt", "a") as f:
             f.write(f"{datetime.datetime.now()} - Starting final errors computing -> \n")
             for e in errors:
                 f.write(":".join(e) + "\n")

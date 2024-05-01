@@ -4,7 +4,7 @@ from datetime import datetime
 from fastapi import FastAPI, Response # the high-level server part
 import scraper, requester # the link to the data being scraped
 import json, uvicorn, threading # the low-level server part
-import os, platform, traceback, signal # to stop the script
+import os, platform, traceback, signal, asyncio # to stop the script
 
 try:
     from ..build_logger import get_logger
@@ -87,13 +87,17 @@ def get_json():
 @app.get("/stop")
 async def stop():
     result = "Fine finished"
+    logger.critical("STOPPING THE SCRIPT FROM API")
     try:
+        SERVER_THREAD.cancel()
+        asyncio.get_event_loop().stop()
         from main import exit
         exit()
     except Exception as e:
         result = str(e)
     finally:
         return Response(content=result, media_type="application/text")
+
 @app.get("/")
 async def root():
     json_data = get_json()

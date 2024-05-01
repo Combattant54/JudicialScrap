@@ -3,7 +3,7 @@ from openpyxl.cell import Cell
 import os
 import logging
 logger = logging.getLogger(__name__)
-import sql_saver
+import sql_saver, models
 from datetime import date
 import json
 import asyncio
@@ -29,6 +29,7 @@ ORDER BY
     fecha_ignicio
 """
 
+select_max_amount = """SELECT """
 SAVER_PARTES_TYPE = 0
 
 NO_PERSONNS_AMOUNT = 16
@@ -49,53 +50,15 @@ DATA_BASE = {
     "N": "Proceso",
     "O": "Estado",
     "P": "DESCARGAR",
+    "Q": "ignored_personns"
 }
 demandados = [
-    "Q",
-    "R",
-    "S",
-    "T",
-    "U",
-    "V",
-    "W",
-    "X",
-    "Y",
-    "Z",
-    "AA",
-    "AB",
-    "AC",
-    "AD",
-    "AE",
-    "AF",
-    "AG",
-    "AH"
 ]
 
 demandantes = [
-    "AI",
-    "AJ",
-    "AK",
-    "AL",
-    "AM",
-    "AN",
-    "AO",
-    "AP",
-    "AQ",
-    "AR",
-    "AS",
-    "AT"
 ]
 
 agraviados = [
-    "AU",
-    "AV",
-    "AW",
-    "AX",
-    "AY",
-    "AZ",
-    "BA",
-    "BB",
-    "BC"
 ]
 
 MAX_PERS_YEARS = 8
@@ -121,7 +84,6 @@ elif SAVER_PARTES_TYPE == 0:
         DATA_BASE[agraviados[i*3 + 2]] = f"AGRAVIADOS {i + 1} (Nombres)"
 
 demandados_aliases = [
-    "DEMANDADO",
     "DENUNCIADO"
 ]
 
@@ -139,29 +101,31 @@ with open("result/data.json", "r") as f:
 YEARS = set(range(1977, today.year))
 DISTRICTS = set(DATA["id_name_districts"].keys())
 INSTANCES = set(DATA["id_instancias_dict"].keys())
-SPECIALIZED = set(((k) for k in d.keys()) for d in DATA["specialized_dict_list"])
+SPECIALIZED = set()
+for d in DATA["specialized_dict_list"]:
+    SPECIALIZED.update([k for k in d.keys()])
+    
+YEARS = {2018}
+# DISTRICTS = {"AMAZONAS"}
+SPECIALIZED = {"FAMILIA CIVIL"}
+INSTANCES = {
+    # "JUZGADO DE PAZ LETRADO",
+    "JUZGADO ESPECIALIZADO", 
+    # "JUZGADO MIXTO", 
+    # "SALA SUPERIOR"
+}
+
 print(YEARS)
 print(DISTRICTS)
 print(INSTANCES)
 print(SPECIALIZED)
 
-YEARS = {2018}
-DISTRICTS = {"AMAZONAS"}
-SPECIALIZED = {"FAMILIA CIVIL"}
-INSTANCES = {
-    "JUZGADO DE PAZ LETRADO",
-    # "JUZGADO ESPECIALIZADO", 
-    # "JUZGADO MIXTO", 
-    # "SALA SUPERIOR"
-}
 active_saver = None
 
-async def init(path, saver: sql_saver.SQLSaver =None):
+async def init(path, save_dir, saver: sql_saver.SQLSaver =None):
     global DB_PATH
     global TARGET_PATH
-    global wb
-    global active_page
-    global current_line
+    global SAVE_DIR
     global active_saver
     
     name, ext = os.path.splitext(path)
@@ -170,6 +134,9 @@ async def init(path, saver: sql_saver.SQLSaver =None):
     
     DB_PATH = name + ext
     TARGET_PATH = name + ".xlsx"
+    SAVE_DIR = str(save_dir)
+    if not os.path.exists(SAVE_DIR):
+        os.makedirs(SAVE_DIR)
     logger.info(DB_PATH)
     logger.info(TARGET_PATH)
     
@@ -179,18 +146,26 @@ async def init(path, saver: sql_saver.SQLSaver =None):
         await active_saver.create_tables()
     else:
         active_saver = saver
-    
-    wb = Workbook()
-    active_page = wb.active
-    
-    for k, v in DATA_BASE.items():
-        active_page[f"{k}{current_line}"] = v
-    current_line += 1
 
 def fill_0(number, number_of_zeros):
     string = str(number)
     string = "0" * (number_of_zeros - len(string)) + string
     return string
+
+def get_file_path(year, district, instance, specialized):
+    year = str(year).lower()
+    district = str(district).lower().replace(" - ", "_").replace(" ", "_")
+    specialized = str(specialized).lower().replace(" - ", "_").replace(" ", "_")
+    instance = str(instance).lower().replace(" - ", "_").replace(" ", "_")
+    filename = f"{year}_{district}_{specialized}_{instance}.xlsx"
+    
+    directory = os.path.join(SAVE_DIR, year)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    path = os.path.join(directory, filename)
+    
+    return path
+    
 
 district_id = 1
 instance_id = 1
@@ -205,14 +180,115 @@ WHERE
 	instance_id = ?
 ORDER BY n_expediente ASC
 """
-def to_excel(save_path: str):
-    global current_line
-    district_id = sql_saver.Districts.get_by(name=DISTRICTS.pop()).id
-    instance_id = sql_saver.Instances.get_by(name=INSTANCES.pop()).id
-    specialized_id = sql_saver.Specialized.get_by(name=SPECIALIZED.pop()).id
-    cursor = active_saver.db.execute(get_all_query, (YEARS.pop(), district_id, instance_id, specialized_id))
+
+async def load_saver(db_filename) -> sql_saver.SQLSaver:
+    folder, filename = os.path.split(DB_PATH)
+    active_saver = sql_saver.SQLSaver(db_filename, folder)
+    with sql_saver.DBLock:
+        await active_saver.create_tables()
+
+def initialize():
+    print("initalization")
+    demandados_id = sql_saver.Partes.get_by(name="DEMANDADO").id
+    demandados_al = []
+    for aliase in demandados_aliases:
+        partes =  sql_saver.Partes.get_by(name=aliase)
+        demandados_al.append(partes.id)
+    params = {demandados_id: tuple(demandados_al)}
+    print(params)
+    print(tuple(params.items()))
+    
+    for k, v in params.items():
+        active_saver.db.execute(
+            models.search_max_table_initating.format(",".join(map(str, v))), 
+            [k]
+        )
+
+def to_excel(year, district_id, instance_id, specialized_id, save_path):
+    print(year, district_id, instance_id, specialized_id)
+    cursor = active_saver.db.execute(models.search_max_partes_request, (year, district_id, instance_id, specialized_id))
+    data = cursor.fetchall()
+    print(data, dict(data))
+    data = dict(data)
+    print(data)
+    
+    wb = Workbook()
+    active_page = wb.active
+    
+    current_line = 1
+    for k, v in DATA_BASE.items():
+        active_page[f"{k}{current_line}"] = v
+    
+    col_offset = len(DATA_BASE)
+    demandados_id = sql_saver.Partes.get_by(name="DEMANDADO").id
+    
+    demandados = []
+    for i in range(data.get(demandados_id, 0)*3):
+        if i % 3 == 0:
+            tipo_de_persona = xl_col_to_name(col_offset + i)
+            active_page[f"{tipo_de_persona}{current_line}"] = f"DEMANDADOS {i // 3 +1} (Tipo de persona)"
+            demandados.append(tipo_de_persona)
+        
+        elif i % 3 == 1:
+            appelido = xl_col_to_name(col_offset + i)
+            active_page[f"{appelido}{current_line}"] = f"DEMANDADOS {i // 3 +1} (Apellido Paterno + Apellido Materno)"
+            demandados.append(appelido)
+        
+        else:
+            nombres = xl_col_to_name(col_offset + i)
+            active_page[f"{nombres}{current_line}"] = f"DEMANDADOS {i // 3 +1} (Nombres)"
+            demandados.append(nombres)
+        
+        
+    
+    col_offset += len(demandados)
+    demandantes_id = sql_saver.Partes.get_by(name="DEMANDANTE").id
+    demandantes = []
+    for i in range(data.get(demandantes_id, 0)*3):
+        if i % 3 == 0:
+            tipo_de_persona = xl_col_to_name(col_offset + i)
+            active_page[f"{tipo_de_persona}{current_line}"] = f"DEMANDANTES {i // 3 +1} (Tipo de persona)"
+            demandantes.append(tipo_de_persona)
+        
+        elif i % 3 == 1:
+            appelido = xl_col_to_name(col_offset + i)
+            active_page[f"{appelido}{current_line}"] = f"DEMANDANTES {i // 3 +1} (Apellido Paterno + Apellido Materno)"
+            demandantes.append(appelido)
+        
+        else:
+            nombres = xl_col_to_name(col_offset + i)
+            active_page[f"{nombres}{current_line}"] = f"DEMANDANTES {i // 3 +1} (Nombres)"
+            demandantes.append(nombres)
+    
+    col_offset += len(demandantes)
+    agraviados_id = sql_saver.Partes.get_by(name="AGRAVIADO").id
+    agraviados = []
+    for i in range(data.get(agraviados_id, 0)*3):
+        if i % 3 == 0:
+            tipo_de_persona = xl_col_to_name(col_offset + i)
+            active_page[f"{tipo_de_persona}{current_line}"] = f"AGRAVIADO {i // 3 +1} (Tipo de persona)"
+            agraviados.append(tipo_de_persona)
+        
+        elif i % 3 == 1:
+            appelido = xl_col_to_name(col_offset + i)
+            active_page[f"{appelido}{current_line}"] = f"AGRAVIADO {i // 3 +1} (Apellido Paterno + Apellido Materno)"
+            agraviados.append(appelido)
+        
+        else:
+            nombres = xl_col_to_name(col_offset + i)
+            active_page[f"{nombres}{current_line}"] = f"AGRAVIADO {i // 3 +1} (Nombres)"
+            agraviados.append(nombres)
+        
+    col_offset += len(agraviados)
+    print(col_offset)
+    print(demandados, demandantes, agraviados)
+    
+    current_line += 1
+    cursor = active_saver.db.execute(get_all_query, (year, district_id, instance_id, specialized_id))
     last_n_expediente = 1
-    for record_tuple in cursor.fetchall():
+    record_tuple = cursor.fetchone()
+    print("first_fetched")
+    while record_tuple:
         record = sql_saver.Records.get_by(id=record_tuple[0])
         assert isinstance(record, sql_saver.Records)
         
@@ -282,18 +358,24 @@ def to_excel(save_path: str):
         personns_records = sql_saver.PersonnRecord.get_all(record_id=record.id)
         personns_records.sort(key = lambda pers: pers.partes_id)
         demandados_pers, demandantes_pers, agraviados_pers = [], [], []
+        if current_line % 100 == 0:
+            print("starting getting personnes on line " + str(current_line))
+        
+        remain_pers = 0
         for i, personn_record in enumerate(personns_records):
             col_number = NO_PERSONNS_AMOUNT + i*4
             partes = sql_saver.Partes.get_by(id=personn_record.partes_id)
             personn = sql_saver.Personns.get_by(id=personn_record.personn_id)
             if SAVER_PARTES_TYPE == 0:
                 partes_name = str(partes.name).strip().upper()
-                if partes_name in demandados_aliases:
+                if partes_name == "DEMANDADO":
                     demandados_pers.append(personn)
                 elif partes_name == "DEMANDANTE":
                     demandantes_pers.append(personn)
                 elif partes_name == "AGRAVIADO":
                     agraviados_pers.append(personn)
+                else:
+                    remain_pers += 1
             elif SAVER_PARTES_TYPE == 1:
                 active_page[f"{xl_col_to_name(col_number + 0)}{current_line}"] = str(partes.name).strip()
                 active_page[f"{xl_col_to_name(col_number + 1)}{current_line}"] = str(sql_saver.PersonnType.get_by(id=personn.type).value).strip()
@@ -301,10 +383,14 @@ def to_excel(save_path: str):
                 active_page[f"{xl_col_to_name(col_number + 3)}{current_line}"] = str(personn.nombres).strip()
         
         if SAVER_PARTES_TYPE == 0:
-            for i, personn in enumerate(demandados_pers):
-                active_page[f"{demandados[i*3]}{current_line}"] = str(sql_saver.PersonnType.get_by(id=personn.type).value).strip()
-                active_page[f"{demandados[i*3+1]}{current_line}"] = str(personn.appelido_paterno + " " + personn.appelido_materno).strip()
-                active_page[f"{demandados[i*3+2]}{current_line}"] = str(personn.nombres).strip()
+            active_page[f"Q{current_line}"] = remain_pers
+            try:
+                for i, personn in enumerate(demandados_pers):
+                    active_page[f"{demandados[i*3]}{current_line}"] = str(sql_saver.PersonnType.get_by(id=personn.type).value).strip()
+                    active_page[f"{demandados[i*3+1]}{current_line}"] = str(personn.appelido_paterno + " " + personn.appelido_materno).strip()
+                    active_page[f"{demandados[i*3+2]}{current_line}"] = str(personn.nombres).strip()
+            except:
+                print(len(demandados))
             
             for i, personn in enumerate(demandantes_pers):
                 active_page[f"{demandantes[i*3]}{current_line}"] = str(sql_saver.PersonnType.get_by(id=personn.type).value).strip()
@@ -318,12 +404,51 @@ def to_excel(save_path: str):
                 
         
         current_line += 1
+        record_tuple = cursor.fetchone()
     
     wb.save(save_path)
-        
-if __name__ == "__main__":
+    wb.close()
+    print("file saved at " + save_path)
+
+async def main(db_path, save_dir, year, district, instance, specialized):
+    await init(db_path, save_dir)
+    initialize()
+    if isinstance(district, int):
+        district_name = sql_saver.Districts.get_by(id=district).name
+        district_id = district
+    else:
+        district_name = district.lower()
+        district_id = sql_saver.Districts.get_by(name=district).id
     
-    db_path = "result/db.db"
-    save_path = os.path.join("result", sys.argv[1])
-    asyncio.run(init(db_path))
-    to_excel(save_path)
+    if isinstance(instance, int):
+        instance_name = sql_saver.Instances.get_by(id=instance).name
+        instance_id = instance
+    else:
+        instance_name = instance.lower()
+        instance_id = sql_saver.Instances.get_by(name=instance).id
+        
+    if isinstance(specialized, int):
+        specialized_name = sql_saver.Specialized.get_by(id=specialized).name
+        specialized_id = specialized
+    else:
+        specialized_name = specialized.lower()
+        specialized_id = sql_saver.Specialized.get_by(name=specialized).id
+    
+    print(district_id, district_name)
+    
+    path = get_file_path(year, district_name, instance_name, specialized_name)
+    async with sql_saver.DBLock:
+        to_excel(year, district_id, instance_id, specialized_id, path)
+
+
+if __name__ == "__main__":
+    args = sys.argv[1:]
+    year = int(args[0])
+    district_id = int(args[1])
+    instance_id = int(args[2])
+    specialized_id = int(args[3])
+    
+    db_path = "result/db_2018.db"
+    save_dir = "result/DATA/excel files"
+    asyncio.run(main(db_path, save_dir, *map(int, args)))
+    

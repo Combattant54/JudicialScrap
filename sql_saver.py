@@ -11,13 +11,14 @@ import os, logging
 import math
 
 from sqliteORM import db, rows
-from sqliteORM.types import INTEGER, TEXT, BIT, DATE
+from sqliteORM.types import INTEGER, TEXT, BIT, DATE, BOOLEAN
 import build_logger
 
 logger = build_logger.get_logger(__name__)
 
 PARTES = set()
 DBLock = asyncio.Lock()
+
 
 class Districts(db.DBTable):
     @classmethod
@@ -144,6 +145,60 @@ class PersonnRecord(db.DBTable):
         PersonnRecord.add_row(rows.DBRow("record_id", INTEGER, foreign_key=Records.get_row("id")))
         PersonnRecord.add_row(rows.DBRow("partes_id", INTEGER, foreign_key=Partes.get_row("id")))
 
+class ScrapedPages(db.DBTable):
+    @classmethod
+    def create(cls):
+        ScrapedPages.add_row(rows.DBRow.build_id_row())
+        ScrapedPages.add_row(rows.DBRow("year", INTEGER, default=2000, primary=True))
+        ScrapedPages.add_row(rows.DBRow("district_id", INTEGER, foreign_key=Districts.get_row("id"), primary=True))
+        ScrapedPages.add_row(rows.DBRow("instance_id", INTEGER, foreign_key=Instances.get_row("id"), primary=True))
+        ScrapedPages.add_row(rows.DBRow("specialized_id", INTEGER, foreign_key=Specialized.get_row("id"), primary=True))
+        ScrapedPages.add_row(rows.DBRow("n_expediente", INTEGER))
+        ScrapedPages.add_row(rows.DBRow("is_saved", BOOLEAN, default=0))
+        ScrapedPages.add_row(rows.DBRow("status", BOOLEAN, default=1))
+        ScrapedPages.add_row(rows.DBRow("downloads", BOOLEAN, default=0))
+    
+    def build_update(self, is_saved=False, status=True, downloads=True):
+        data = {
+            "year": self.year,
+            "n_expediente": self.n_expediente
+        }
+        if isinstance(self.district_id, Districts):
+            data.update({
+                "district_id": self.district_id.id,
+                "instance_id": self.instance_id.id,
+                "specialized_id": self.specialized.id,
+            })
+        msg = "UPDATE scrapedpages "
+        msg += "SET is_saved = ?, status = ?, downloads = ? "
+        msg += f"WHERE ({' AND '.join([f'{name} = ?' for name in data.keys()])})"
+        
+        args = [
+            1 if is_saved else 0,
+            1 if status else 0,
+            1 if downloads else 0,
+            *data.values()
+        ]
+        
+        return msg, args
+    
+    @staticmethod
+    def build_create(
+            **kwargs
+        ):
+        #kwargs["id"] = "SELECT IFNULL(MAX(id) + 1, 0) FROM scrapedpages"
+        kwargs["is_saved"] = 1 if kwargs.get("is_saved", False) else 0
+        kwargs["status"] = 1 if kwargs.get("status", True) else 0
+        kwargs["downloads"] = 1 if kwargs.get("downloads", True) else 0
+        
+        val = [" ( SELECT IFNULL(MAX(id) + 1, 0) FROM scrapedpages ) "]
+        val.extend(['?'] * len(kwargs))
+        msg = f"INSERT INTO scrapedpages ({', '.join(['id'] + list(kwargs.keys()))}) "
+        msg += f"VALUES ({', '.join(val)})"
+        
+        
+        return msg, list(kwargs.values())
+
 class Trial(db.DBTable):
     pass
 
@@ -253,9 +308,82 @@ class SQLSaver(Saver):
         self.db.add_table(Records)
         self.db.add_table(Partes)
         self.db.add_table(PersonnRecord)
+        self.db.add_table(ScrapedPages)
+        
+        # self.db.execute("DROP TABLE scrapedpages")
         
         self.db.create_tables()
         
+        
+    async def mark_unsaved(self, *args, **kwargs):
+        return await self.mark_as_saved(*args, **kwargs, saved=False, status=False)
+        
+    async def mark_as_saved(self, year, district, instance, specialized, n_expediente, saved=True, status=True, download=True):
+        district_id = Districts.get_by(name=district).id
+        instance_id = Instances.get_by(name=instance).id
+        specialized_id = Specialized.get_by(name=specialized).id
+        
+        data = {
+            "year": int(year),
+            "district_id": district_id,
+            "instance_id": instance_id,
+            "specialized_id": specialized_id,
+            "n_expediente": int(n_expediente),
+        }
+        page = ScrapedPages.get_by(**data)
+        if page is None:
+            c = self.db.execute(*ScrapedPages.build_create(**data, is_saved=saved, status=status, downloads=download))
+            return
+        
+        msg, args = page.build_update(is_saved=saved, status=status, downloads=download)
+        
+        c = self.db.execute(msg, args)
+        if c is None:
+            logger.critical(data)
+            
+        
+        
+    async def is_saved(self, year, district, instance, specialized, n_expediente):
+        district = Districts.get_by(name = district)
+        if district is None:
+            return (False, False)
+        
+        instance = Instances.get_by(name=instance)
+        if instance is None:
+            return (False, False)
+        
+        specialized = Specialized.get_by(name=specialized)
+        if specialized is None:
+            return (False, False)
+        
+        data = {
+            "year": year,
+            "district_id": district.id,
+            "instance_id": instance.id,
+            "specialized_id": specialized.id,
+            "n_expediente": n_expediente
+        }
+        
+        page = ScrapedPages.get_by(**data)
+        if page is None:
+            return (False, False)
+        
+        return (page.is_saved == 1 or page.is_saved, page.status == 1 or page.status)
+    
+    async def check_page(self, year, district, instance, specialized, n_expediente):
+        try:
+            n_expediente = int(n_expediente)
+            year = int(year)
+            async with DBLock:
+                data = await self.is_saved(year, district, instance, specialized, n_expediente)
+        except Exception as e:
+            logger.warning("exception : " + str(e))
+            logger.warning("in %d %s %s %s %d" % (year, district, instance, specialized, n_expediente))
+            data = (False, False)
+        
+        logger.info(data)
+        return data
+    
     async def get_filtrer(self, json_data_filter_path="data.json"):
         await self.create_tables()
         return
@@ -421,7 +549,7 @@ class SQLSaver(Saver):
         record = Records.get_by(**datas_dict)
         
         if record is not None:
-            logger.debug(f"record already saved : {record_id_string} not saving a second time")
+            # logger.debug(f"record already saved : {record_id_string} not saving a second time")
             with open("errored.txt", "a") as f:
                 f.write(f"{datetime.datetime.now()} - record already saved : {record_id_string} not saving a second time\n")
             return
@@ -503,19 +631,31 @@ class SQLSaver(Saver):
         # logger.debug("record " + record_id_string + " saved")
         # print("record " + record_id_string + " saved")
 
-    async def compute_informations(self, informations, district_name, instance_name, specialized_name):
+    async def compute_informations(self, informations, district_name, instance_name, specialized_name, all_saved=True):
         # print("computing informations : " + str(len(informations)))
-        for info in informations:
-            try:
-                async with DBLock:
+        try:
+            async with DBLock:
+                for info in informations:
                     await self.save_informations(
                         info, 
                         district_name=district_name, 
                         instance_name=instance_name, 
                         specialized_name=specialized_name
                     )
-            except:
-                logger.exception("Error during saving informations : " + str(info))
+                n_expediente, year, *_ = informations[0]["trial_id"].split("-")
+                has_download = [info.get("descargar", False) for info in informations]
+                
+                await self.mark_as_saved(
+                    year, 
+                    district_name, 
+                    instance_name, 
+                    specialized_name, 
+                    n_expediente, 
+                    download = any(has_download),
+                    saved=all_saved
+                )
+        except:
+            logger.exception("Error during saving informations : " + str(info))
         self.commit("adding records")
         
 def test():

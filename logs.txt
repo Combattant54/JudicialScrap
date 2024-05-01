@@ -1,0 +1,219 @@
+INFO:[2024-04-05 17:52:41,770]:api-112 : SERVER_THREAD : Thread-6
+INFO:[2024-04-05 17:52:41,771]:requester-223 : starting getting cookies
+DEBUG:[2024-04-05 17:52:42,074]:scraper-460 : awaiting year 2018
+INFO:[2024-04-05 17:52:42,074]:scraper-357 : awaiting district of AMAZONAS
+INFO:[2024-04-05 17:52:42,075]:scraper-357 : awaiting district of ANCASH
+INFO:[2024-04-05 17:52:42,075]:scraper-357 : awaiting district of APURIMAC
+INFO:[2024-04-05 17:52:42,075]:scraper-357 : awaiting district of AREQUIPA
+INFO:[2024-04-05 17:52:42,075]:scraper-357 : awaiting district of AYACUCHO
+INFO:[2024-04-05 17:52:42,075]:scraper-357 : awaiting district of CAJAMARCA
+INFO:[2024-04-05 17:52:42,075]:scraper-357 : awaiting district of CALLAO
+INFO:[2024-04-05 17:52:42,075]:scraper-357 : awaiting district of CAÑETE
+INFO:[2024-04-05 17:52:42,075]:scraper-357 : awaiting district of CUSCO
+INFO:[2024-04-05 17:52:42,075]:scraper-357 : awaiting district of DEL SANTA
+INFO:[2024-04-05 17:52:42,075]:scraper-357 : awaiting district of HUANCAVELICA
+INFO:[2024-04-05 17:52:42,075]:scraper-357 : awaiting district of HUANUCO
+INFO:[2024-04-05 17:52:42,075]:scraper-357 : awaiting district of HUAURA
+INFO:[2024-04-05 17:52:42,075]:scraper-357 : awaiting district of ICA
+INFO:[2024-04-05 17:52:42,076]:scraper-357 : awaiting district of JUNIN
+INFO:[2024-04-05 17:52:42,076]:scraper-357 : awaiting district of LA LIBERTAD
+INFO:[2024-04-05 17:52:42,076]:scraper-357 : awaiting district of LAMBAYEQUE
+INFO:[2024-04-05 17:52:42,076]:scraper-357 : awaiting district of LIMA
+INFO:[2024-04-05 17:52:42,076]:scraper-357 : awaiting district of LIMA ESTE
+INFO:[2024-04-05 17:52:42,076]:scraper-357 : awaiting district of LIMA NORTE
+INFO:[2024-04-05 17:52:42,076]:scraper-357 : awaiting district of LIMA SUR
+INFO:[2024-04-05 17:52:42,076]:scraper-357 : awaiting district of LORETO
+INFO:[2024-04-05 17:52:42,076]:scraper-357 : awaiting district of MADRE DE DIOS
+INFO:[2024-04-05 17:52:42,076]:scraper-357 : awaiting district of MOQUEGUA
+INFO:[2024-04-05 17:52:42,076]:scraper-357 : awaiting district of PASCO
+INFO:[2024-04-05 17:52:42,076]:scraper-357 : awaiting district of PIURA
+INFO:[2024-04-05 17:52:42,076]:scraper-357 : awaiting district of PUNO
+INFO:[2024-04-05 17:52:42,077]:scraper-357 : awaiting district of SAN MARTIN
+INFO:[2024-04-05 17:52:42,077]:scraper-357 : awaiting district of SELVA CENTRAL
+INFO:[2024-04-05 17:52:42,077]:scraper-357 : awaiting district of SULLANA
+INFO:[2024-04-05 17:52:42,077]:scraper-357 : awaiting district of TACNA
+INFO:[2024-04-05 17:52:42,077]:scraper-357 : awaiting district of TUMBES
+INFO:[2024-04-05 17:52:42,077]:scraper-357 : awaiting district of UCAYALI
+INFO:[2024-04-05 17:52:42,077]:scraper-357 : awaiting district of VENTANILLA - LIMA NOROESTE
+DEBUG:[2024-04-05 17:52:42,077]:scraper-463 : years awaited, errors are : []
+DEBUG:[2024-04-05 17:52:42,077]:scraper-480 : []
+CRITICAL:[2024-04-05 17:52:42,077]:scraper-488 : stoping the script
+CRITICAL:[2024-04-05 17:52:43,773]:__main__-106 : {
+  "COOKIES_QUEUE_AMOUNT": 0,
+  "COOKIES_QUEUE_MAXSIZE": 4,
+  "IS_DIRECT_SAVER": false,
+  "api_status": {
+    "intialized_time": "2024-04-05 17:52:14.585981",
+    "started_time": "2024-04-05 17:52:41.768372",
+    "running_time": "0:00:02.004089"
+  },
+  "scraper_configuration": {
+    "URL": "https://cej.pj.gob.pe",
+    "FORM_URL": "/cej/forms/busquedaform.html",
+    "synchronous_amount": 10,
+    "breaks_amount": 20,
+    "districts": [
+      "APURIMAC",
+      "LIMA ESTE",
+      "LA LIBERTAD",
+      "HUANUCO",
+      "CALLAO",
+      "ANCASH",
+      "UCAYALI",
+      "CUSCO",
+      "SELVA CENTRAL",
+      "MOQUEGUA",
+      "SULLANA",
+      "SAN MARTIN",
+      "AMAZONAS",
+      "LIMA",
+      "PIURA",
+      "CAJAMARCA",
+      "PUNO",
+      "LORETO",
+      "PASCO",
+      "AREQUIPA",
+      "VENTANILLA - LIMA NOROESTE",
+      "DEL SANTA",
+      "LAMBAYEQUE",
+      "HUANCAVELICA",
+      "LIMA NORTE",
+      "MADRE DE DIOS",
+      "TACNA",
+      "AYACUCHO",
+      "TUMBES",
+      "CA\u00d1ETE",
+      "JUNIN",
+      "HUAURA",
+      "ICA",
+      "LIMA SUR"
+    ],
+    "years": [
+      2018
+    ],
+    "instances": [
+      "JUZGADO MIXITO"
+    ],
+    "specialized": [
+      "FAMILIA CIVIL"
+    ]
+  },
+  "scraper_advancement": {
+    "page_scraped": 0,
+    "scraped_scraped": [
+      2018
+    ],
+    "scraped_districts": [],
+    "scraped_instances": [],
+    "scraped_specialized": [],
+    "scraped_n_expedientes": [],
+    "scraping_scraped": [],
+    "scraping_districts": [],
+    "scraping_instances": [],
+    "scraping_specialized": [],
+    "scraping_n_expedientes": []
+  }
+}
+INFO:[2024-04-05 17:52:43,773]:__main__-107 : starting_time :2024-04-05 17:52:41.770763
+CRITICAL:[2024-04-05 17:52:43,774]:__main__-112 : main task finished
+CRITICAL:[2024-04-05 17:52:43,774]:__main__-119 : {
+  "COOKIES_QUEUE_AMOUNT": 0,
+  "COOKIES_QUEUE_MAXSIZE": 4,
+  "IS_DIRECT_SAVER": false,
+  "api_status": {
+    "intialized_time": "2024-04-05 17:52:14.585981",
+    "started_time": "2024-04-05 17:52:41.768372",
+    "running_time": "0:00:02.006188"
+  },
+  "scraper_configuration": {
+    "URL": "https://cej.pj.gob.pe",
+    "FORM_URL": "/cej/forms/busquedaform.html",
+    "synchronous_amount": 10,
+    "breaks_amount": 20,
+    "districts": [
+      "APURIMAC",
+      "LIMA ESTE",
+      "LA LIBERTAD",
+      "HUANUCO",
+      "CALLAO",
+      "ANCASH",
+      "UCAYALI",
+      "CUSCO",
+      "SELVA CENTRAL",
+      "MOQUEGUA",
+      "SULLANA",
+      "SAN MARTIN",
+      "AMAZONAS",
+      "LIMA",
+      "PIURA",
+      "CAJAMARCA",
+      "PUNO",
+      "LORETO",
+      "PASCO",
+      "AREQUIPA",
+      "VENTANILLA - LIMA NOROESTE",
+      "DEL SANTA",
+      "LAMBAYEQUE",
+      "HUANCAVELICA",
+      "LIMA NORTE",
+      "MADRE DE DIOS",
+      "TACNA",
+      "AYACUCHO",
+      "TUMBES",
+      "CA\u00d1ETE",
+      "JUNIN",
+      "HUAURA",
+      "ICA",
+      "LIMA SUR"
+    ],
+    "years": [
+      2018
+    ],
+    "instances": [
+      "JUZGADO MIXITO"
+    ],
+    "specialized": [
+      "FAMILIA CIVIL"
+    ]
+  },
+  "scraper_advancement": {
+    "page_scraped": 0,
+    "scraped_scraped": [
+      2018
+    ],
+    "scraped_districts": [],
+    "scraped_instances": [],
+    "scraped_specialized": [],
+    "scraped_n_expedientes": [],
+    "scraping_scraped": [],
+    "scraping_districts": [],
+    "scraping_instances": [],
+    "scraping_specialized": [],
+    "scraping_n_expedientes": []
+  }
+}
+CRITICAL:[2024-04-05 17:52:43,775]:__main__-122 : starting_time :2024-04-05 17:52:41.770763
+CRITICAL:[2024-04-05 17:52:43,775]:__main__-123 : ending_time :2024-04-05 17:52:43.775130
+CRITICAL:[2024-04-05 17:52:43,775]:__main__-124 : exiting after running_time : 0:00:02.004367
+CRITICAL:[2024-04-05 17:52:43,812]:__main__-136 : NoneType: None
+
+CRITICAL:[2024-04-05 17:52:43,812]:scraper-488 : stoping the script
+WARNING:[2024-04-05 17:52:43,816]:__main__-145 : Can't cancell the task <Task finished name='Task-2' coro=<scrap() done, defined at /home/arthur/python/judicial/scraper.py:367> result=None> ; Message: invalid session id
+Stacktrace:
+#0 0x55c893b44dd3 <unknown>
+#1 0x55c893851707 <unknown>
+#2 0x55c89388de4d <unknown>
+#3 0x55c8938bd504 <unknown>
+#4 0x55c8938b8429 <unknown>
+#5 0x55c8938b761e <unknown>
+#6 0x55c89381ea6f <unknown>
+#7 0x55c893b0cbef <unknown>
+#8 0x55c893b10b07 <unknown>
+#9 0x55c893afac68 <unknown>
+#10 0x55c893b1157d <unknown>
+#11 0x55c893ae00fe <unknown>
+#12 0x55c89381d098 <unknown>
+#13 0x7f2392493d90 <unknown>
+
+INFO:[2024-04-05 17:52:43,851]:__main__-153 : pkill running
+INFO:[2024-04-05 17:52:43,960]:__main__-155 : kill running

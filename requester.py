@@ -4,7 +4,7 @@ from requests.exceptions import ProxyError
 from selenium.webdriver.edge.webdriver import WebDriver
 
 from bs4 import BeautifulSoup
-from bs4.element import Tag, PageElement, NavigableString
+from bs4.element import Tag, PageElement, NavigableString, ResultSet
 from functools import partial
 
 import logging
@@ -16,6 +16,7 @@ from contextlib import asynccontextmanager
 import json
 import typing
 import time
+import os
 
 from utils import get_cookies_dict
 
@@ -35,6 +36,7 @@ CURRENT_YEAR = 2023
 CERT_PATH = "certificates/burp-suite-certificate.pem"
 SEARCH_URL = "/cej/forms/busquedaform.html"
 GET_FORM_URL = "/cej/forms/detalleform.html"
+DOWNLOAD_URL = "/cej/forms/documentoD.html"
 
 HEADERS = {
     "Host":"cej.pj.gob.pe",
@@ -80,7 +82,7 @@ def init(base_url, captcha_url, proxies={}):
 
     _initialized = True
 
-def stop():
+def  stop():
     global _initialized
     _initialized = False
 
@@ -164,6 +166,24 @@ async def send(req: requests.PreparedRequest, timeout=15, reconnection_amount=3,
                 logger.warning(e)
                 time.sleep(5)
                 return await send(req, timeout=timeout, reconnection_amount=reconnection_amount-1, **kwargs)
+    return r
+
+async def download_request(req: requests.PreparedRequest, filepath: str, timeout=15, **kwargs) -> requests.Response:
+    
+    if isinstance(req, requests.Request):
+        req.prepare()
+    
+    try:
+        with requests.Session() as sess:
+            with sess.send(req, stream=True, timeout=timeout, verify=False, **kwargs) as r:
+                r.raise_for_status()
+                with open(filepath, "wb") as f:
+                    for chunk in r.iter_content(8096):
+                        if chunk:
+                            f.write(chunk)
+    except requests.HTTPError as e:
+        logger.warning(str(e))
+    
     return r
 
 async def get_captcha(cookies) -> str:
@@ -540,7 +560,7 @@ async def validate(
         elif len(r.text.strip()) > 10 and tries > 0:
             return await validate(cookies, district, instance, specialized, year, n_expediente, captcha, tries-1)
         else:
-            logger.warning("get false from the server : " + r.text.strip().splitlines()[0])
+            # logger.warning("get false from the server : " + r.text.strip().splitlines()[0])
             return code
     except Exception as e:
         logger.info(type(r))
@@ -595,7 +615,9 @@ async def compute_result(
     if searched_page is None:
         print("no searched page")
         return None
-
+    
+    all_saved = True
+    
     soup = BeautifulSoup(searched_page.text, "html.parser")
     content = soup.find("div", {"id": "divDetalles"})
     ids = {}
@@ -604,7 +626,7 @@ async def compute_result(
         logger.error("No div with id 'divDetalles' found, the script raise an error if continue")
         logger.error(searched_page)
         logger.error(searched_page.text)
-        return None
+        return None, False
     
     for i, child in enumerate(content.findChildren("form", {"id": "command", "action": "detalleform.html", "method": "post"})):
         number = child.get("name", None)
@@ -619,14 +641,17 @@ async def compute_result(
     coroutines = []
     
     for i, v in ids.items():
-        coroutines.append(handle_one_form_id(cookies, v))
+        coroutines.append(handle_one_form_id(cookies, v, download=False))
         
     result_list = await asyncio.gather(*coroutines)
     forms = [form for form in result_list if form is not None]
     
-    return forms
+    if len(forms) < len(result_list):
+        all_saved = False
+    
+    return forms, all_saved and any(forms)
         
-async def handle_one_form_id(cookies, id, retry=True):
+async def handle_one_form_id(cookies, id, retry=True, download=False):
     request_param = {
         "nroRegistro":id
     }
@@ -637,20 +662,48 @@ async def handle_one_form_id(cookies, id, retry=True):
     r = await send(req)
     
     if r.status_code != 200:
-        logger.warning("status code of" + str(r.status_code))
+        logger.warning("status code of " + str(r.status_code))
+        r.raise_for_status()
         return None
     
     try:
-        form = await get_one_form(text=r.text, id=id)
+        form = await get_one_form(text=r.text, id=id, download=download, cookies=cookies)
     except AttributeError:
         if retry:
-            return await handle_one_form_id(cookies=None, id=id, retry=False)
+            return await handle_one_form_id(cookies=None, id=id, retry=False, download=download)
         else:
             raise
     return form
     
+async def download_pdf(cookies, infos, pdf_code, number):
+    request_param = {
+        "nid": pdf_code
+    }
+    district, instance, specialized, year, n_expediente = infos["trial_id"].split(":")
+    
+    req = requests.Request("GET", url=URL+DOWNLOAD_URL, headers=HEADERS, cookies=cookies, data=request_param)
+    
+    folder_path = os.path.join(
+        os.getcwd(), 
+        "result", 
+        str(year),
+        str(infos["district"]),
+        str(infos["organo"]) + " -- "+str(infos["specialized"])
+    )
+    
+    if not os.path.exists(folder_path):
+        logger.warning("creating folder : {}".format(folder_path))
+    
+    filepath = os.path.join(
+        folder_path,
+        f"{infos['trial id']}_{infos['fecha de ignicio']}__{number}.pdf"
+    )
+    
+    resp = await download_request(req=req, filepath=filepath)
+    
+    return resp
 
-async def get_one_form(text: str, id=None):
+async def get_one_form(text: str, id=None, download=True, cookies={}):
     soup = BeautifulSoup(text, "html.parser")
     
     switch_dict = {
@@ -681,12 +734,12 @@ async def get_one_form(text: str, id=None):
     
     infos = {}
     
-    # async with aopen(f"result/page{id}.html", "x") as f:
-    #     await f.write(text)
-    
     #scrap le premier pannel
     pannel_one_values = {}
-    pannel_one_children = soup.find("div", {"id": "collapseOneG"}).find("div", {"id": "gridRE"}).children
+    pannel_one = soup.find("div", {"id": "collapseOneG"})
+    if pannel_one is None:
+        print(str(soup), id)
+    pannel_one_children = pannel_one.find("div", {"id": "gridRE"}).children
         
     for child in pannel_one_children:
         if not isinstance(child, Tag):
@@ -785,10 +838,30 @@ async def get_one_form(text: str, id=None):
     infos["personns"] = pannel_two_values
 
     #scrap pannel three (descargar)
-    dowloads_list = soup.find("div", {"id": "collapseThree"}).find_all("a", {"class": "aDescarg"})
+    downloads_list = soup.find("div", {"id": "collapseThree"}).find_all("a", {"class": "aDescarg"})
     
-    if len(dowloads_list) > 0:
+    downloads_data = {}
+    
+    if download and len(downloads_list) > 0:
         infos["descargar"] = True
+        assert isinstance(downloads_list, ResultSet)
+        for i, result in enumerate(downloads_list):
+            if not isinstance(result, Tag):
+                continue
+            result: Tag
+            url = result.get("href", None)
+            if url is None:
+                continue
+            
+            *_, data_string = url.split("?")
+            data_name, data_value = data_string.split("=")
+            
+            if data_name != "nid":
+                continue
+            
+            dat = await download_pdf(cookies=cookies, infos=info, number=i, pdf_code=data_value)
+            
+                
     else:
         infos["descargar"] = False
     

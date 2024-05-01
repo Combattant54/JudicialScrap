@@ -82,12 +82,13 @@ async def main(mode="INFO", logs_file=LOGS_FILE, save_file="result/output.xlxs",
     # définit le fichier de log
     global LOGS_FILE
     LOGS_FILE = logs_file
+    global LOGGER
     if not os.path.exists(LOGS_FILE):
         with open(LOGS_FILE, "x"):
             pass
     
     build_logger.set_level(mode)
-    logger = build_logger.get_logger(__name__)
+    LOGGER = build_logger.get_logger(__name__)
     
     # cré le saver
     path, name = os.path.split(save_file)
@@ -102,41 +103,52 @@ async def main(mode="INFO", logs_file=LOGS_FILE, save_file="result/output.xlxs",
         starting_time = datetime.datetime.now()
         MAIN_TASK = scraper_task
         await asyncio.sleep(2)
-        logger.critical(api.get_json())
-        logger.info("starting_time :", starting_time)
+        LOGGER.critical(api.get_json())
+        LOGGER.info("starting_time :" + str(starting_time))
         
+        LOGGER.debug("starting awaiting MAIN TASK")
         await MAIN_TASK
+        print("main task finished")
+        LOGGER.critical("main task finished")
     except Exception as e:
-        for ligne in traceback.format_exception():
-            logger.error(ligne)
-        logger.exception("Getting an exception : " + str(e))
+        extype, value, tb = sys.exc_info()
+        for ligne in traceback.format_exception(extype, value, tb):
+            LOGGER.error(ligne)
+        LOGGER.exception("Getting an exception : " + str(e))
     finally:
-        logger.critical(api.get_json())
+        LOGGER.critical(api.get_json())
         ending_time = datetime.datetime.now()
         running_time = ending_time - starting_time
-        logger.critical("starting_time :", starting_time)
-        logger.critical("ending_time :", ending_time)
-        logger.critical("exiting after running_time : ", running_time)
+        LOGGER.critical("starting_time :" + str(starting_time))
+        LOGGER.critical("ending_time :" + str(ending_time))
+        LOGGER.critical("exiting after running_time : " + str(running_time))
         try:
             MAIN_TASK.cancel()
         except:
-            logger.warning("Can't cancell the task " + str(MAIN_TASK))
+            LOGGER.warning("Can't cancell the task " + str(MAIN_TASK))
         exit()
-        logger.critical("exit system")
+        LOGGER.critical("exit system")
         sys.exit(4)
 
 def exit():
-    traceback.print_stack(limit=15)
+    traceback.print_stack(limit=30)
+    extyp, value, tb = sys.exc_info()
+    LOGGER.critical("\n".join(traceback.format_exception(extyp, value, tb, limit=30)))
     global stop
     logger = build_logger.get_logger(__name__)
     try:
         stop = True
         try:
             MAIN_TASK.cancel()
-        except:
-            logger.warning("Can't cancell the task " + str(MAIN_TASK))
-        scraper.stop()
-        api.stop()
+            scraper.stop()
+        except Exception as e:
+            logger.warning("Can't cancell the task " + str(MAIN_TASK) + " ; " + str(e))
+        try:
+            asyncio.run(api.stop())
+        except Exception as e:
+            print(type(e))
+            print(e)
+            asyncio.get_event_loop().run_until_complete(api.stop())
     except:
         pass
     finally:

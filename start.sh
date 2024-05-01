@@ -9,25 +9,30 @@ if (($size < 10)); then
 fi
 cd /home/arthur/python/judicial
 
-if [[ -z $1 ]]; then 
+
+if [ -z "$1" ] 
+  then 
   years="ALL"
 else
   years=$1
 fi
 
-if [[ -z $2 ]]; then 
+if [ -z "$2" ] 
+  then 
   districts="ALL"
 else
   districts=$2
 fi
 
-if [[ -z $3 ]]; then 
+if [ -z "$3" ]
+  then 
   instances="ALL"
 else
   instances=$3
 fi
 
-if [[ -z $4 ]]; then 
+if [ -z "$4" ]
+  then 
   specialized="ALL"
 else
   specialized=$4
@@ -37,4 +42,4 @@ echo $years
 echo $districts
 echo $instances
 echo $specialized
-python3.9 -u main.py "${years}" "${districts}" "${instances}" "${specialized}" --sql_saver -m INFO > task_logs.txt
+python3.9 -u main.py "${years}" "${districts}" "${instances}" "${specialized}" -m INFO > logs/task_logs.txt

@@ -1,11 +1,16 @@
-import logging
+import logging, os
 
+LOGS_DIR = "logs"
+LOGS_FILE = os.path.join(LOGS_DIR, "logs.txt")
 FORMAT = "%(levelname)s:[%(asctime)s]:%(name)s-%(lineno)s : %(msg)s"
 formatter = logging.Formatter(FORMAT)
 
-with open("logs.txt", "w") as f:
+if not os.path.exists(LOGS_DIR):
+    os.makedirs(LOGS_DIR)
+
+with open(LOGS_FILE, "w") as f:
     pass
-fh = logging.FileHandler("logs.txt", mode="a")
+fh = logging.FileHandler(LOGS_FILE, mode="a")
 fh.setLevel(logging.DEBUG)
 fh.setFormatter(formatter)
 

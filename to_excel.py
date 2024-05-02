@@ -50,7 +50,6 @@ DATA_BASE = {
     "N": "Proceso",
     "O": "Estado",
     "P": "DESCARGAR",
-    "Q": "ignored_personns"
 }
 demandados = [
 ]
@@ -206,11 +205,6 @@ def initialize():
 
 def to_excel(year, district_id, instance_id, specialized_id, save_path):
     print(year, district_id, instance_id, specialized_id)
-    cursor = active_saver.db.execute(models.search_max_partes_request, (year, district_id, instance_id, specialized_id))
-    data = cursor.fetchall()
-    print(data, dict(data))
-    data = dict(data)
-    print(data)
     
     wb = Workbook()
     active_page = wb.active
@@ -220,72 +214,10 @@ def to_excel(year, district_id, instance_id, specialized_id, save_path):
         active_page[f"{k}{current_line}"] = v
     
     col_offset = len(DATA_BASE)
-    demandados_id = sql_saver.Partes.get_by(name="DEMANDADO").id
-    
-    demandados = []
-    for i in range(data.get(demandados_id, 0)*3):
-        if i % 3 == 0:
-            tipo_de_persona = xl_col_to_name(col_offset + i)
-            active_page[f"{tipo_de_persona}{current_line}"] = f"DEMANDADOS {i // 3 +1} (Tipo de persona)"
-            demandados.append(tipo_de_persona)
-        
-        elif i % 3 == 1:
-            appelido = xl_col_to_name(col_offset + i)
-            active_page[f"{appelido}{current_line}"] = f"DEMANDADOS {i // 3 +1} (Apellido Paterno + Apellido Materno)"
-            demandados.append(appelido)
-        
-        else:
-            nombres = xl_col_to_name(col_offset + i)
-            active_page[f"{nombres}{current_line}"] = f"DEMANDADOS {i // 3 +1} (Nombres)"
-            demandados.append(nombres)
-        
-        
-    
-    col_offset += len(demandados)
-    demandantes_id = sql_saver.Partes.get_by(name="DEMANDANTE").id
-    demandantes = []
-    for i in range(data.get(demandantes_id, 0)*3):
-        if i % 3 == 0:
-            tipo_de_persona = xl_col_to_name(col_offset + i)
-            active_page[f"{tipo_de_persona}{current_line}"] = f"DEMANDANTES {i // 3 +1} (Tipo de persona)"
-            demandantes.append(tipo_de_persona)
-        
-        elif i % 3 == 1:
-            appelido = xl_col_to_name(col_offset + i)
-            active_page[f"{appelido}{current_line}"] = f"DEMANDANTES {i // 3 +1} (Apellido Paterno + Apellido Materno)"
-            demandantes.append(appelido)
-        
-        else:
-            nombres = xl_col_to_name(col_offset + i)
-            active_page[f"{nombres}{current_line}"] = f"DEMANDANTES {i // 3 +1} (Nombres)"
-            demandantes.append(nombres)
-    
-    col_offset += len(demandantes)
-    agraviados_id = sql_saver.Partes.get_by(name="AGRAVIADO").id
-    agraviados = []
-    for i in range(data.get(agraviados_id, 0)*3):
-        if i % 3 == 0:
-            tipo_de_persona = xl_col_to_name(col_offset + i)
-            active_page[f"{tipo_de_persona}{current_line}"] = f"AGRAVIADO {i // 3 +1} (Tipo de persona)"
-            agraviados.append(tipo_de_persona)
-        
-        elif i % 3 == 1:
-            appelido = xl_col_to_name(col_offset + i)
-            active_page[f"{appelido}{current_line}"] = f"AGRAVIADO {i // 3 +1} (Apellido Paterno + Apellido Materno)"
-            agraviados.append(appelido)
-        
-        else:
-            nombres = xl_col_to_name(col_offset + i)
-            active_page[f"{nombres}{current_line}"] = f"AGRAVIADO {i // 3 +1} (Nombres)"
-            agraviados.append(nombres)
-        
-    col_offset += len(agraviados)
     print(col_offset)
-    print(demandados, demandantes, agraviados)
     
     current_line += 1
     cursor = active_saver.db.execute(get_all_query, (year, district_id, instance_id, specialized_id))
-    last_n_expediente = 1
     record_tuple = cursor.fetchone()
     print("first_fetched")
     while record_tuple:
@@ -357,51 +289,17 @@ def to_excel(year, district_id, instance_id, specialized_id, save_path):
         # récupère les personnes
         personns_records = sql_saver.PersonnRecord.get_all(record_id=record.id)
         personns_records.sort(key = lambda pers: pers.partes_id)
-        demandados_pers, demandantes_pers, agraviados_pers = [], [], []
-        if current_line % 100 == 0:
+        if current_line % 500 == 0:
             print("starting getting personnes on line " + str(current_line))
         
-        remain_pers = 0
         for i, personn_record in enumerate(personns_records):
-            col_number = NO_PERSONNS_AMOUNT + i*4
+            col_number = col_offset + i*4
             partes = sql_saver.Partes.get_by(id=personn_record.partes_id)
             personn = sql_saver.Personns.get_by(id=personn_record.personn_id)
-            if SAVER_PARTES_TYPE == 0:
-                partes_name = str(partes.name).strip().upper()
-                if partes_name == "DEMANDADO":
-                    demandados_pers.append(personn)
-                elif partes_name == "DEMANDANTE":
-                    demandantes_pers.append(personn)
-                elif partes_name == "AGRAVIADO":
-                    agraviados_pers.append(personn)
-                else:
-                    remain_pers += 1
-            elif SAVER_PARTES_TYPE == 1:
-                active_page[f"{xl_col_to_name(col_number + 0)}{current_line}"] = str(partes.name).strip()
-                active_page[f"{xl_col_to_name(col_number + 1)}{current_line}"] = str(sql_saver.PersonnType.get_by(id=personn.type).value).strip()
-                active_page[f"{xl_col_to_name(col_number + 2)}{current_line}"] = str(personn.appelido_paterno + " " + personn.appelido_materno).strip()
-                active_page[f"{xl_col_to_name(col_number + 3)}{current_line}"] = str(personn.nombres).strip()
-        
-        if SAVER_PARTES_TYPE == 0:
-            active_page[f"Q{current_line}"] = remain_pers
-            try:
-                for i, personn in enumerate(demandados_pers):
-                    active_page[f"{demandados[i*3]}{current_line}"] = str(sql_saver.PersonnType.get_by(id=personn.type).value).strip()
-                    active_page[f"{demandados[i*3+1]}{current_line}"] = str(personn.appelido_paterno + " " + personn.appelido_materno).strip()
-                    active_page[f"{demandados[i*3+2]}{current_line}"] = str(personn.nombres).strip()
-            except:
-                print(len(demandados))
-            
-            for i, personn in enumerate(demandantes_pers):
-                active_page[f"{demandantes[i*3]}{current_line}"] = str(sql_saver.PersonnType.get_by(id=personn.type).value).strip()
-                active_page[f"{demandantes[i*3+1]}{current_line}"] = str(personn.appelido_paterno + " " + personn.appelido_materno).strip()
-                active_page[f"{demandantes[i*3+2]}{current_line}"] = str(personn.nombres).strip()
-            
-            for i, personn in enumerate(agraviados_pers):
-                active_page[f"{agraviados[i*3]}{current_line}"] = str(sql_saver.PersonnType.get_by(id=personn.type).value).strip()
-                active_page[f"{agraviados[i*3+1]}{current_line}"] = str(personn.appelido_paterno + " " + personn.appelido_materno).strip()
-                active_page[f"{agraviados[i*3+2]}{current_line}"] = str(personn.nombres).strip()
-                
+            active_page[f"{xl_col_to_name(col_number + 0)}{current_line}"] = str(partes.name).strip()
+            active_page[f"{xl_col_to_name(col_number + 1)}{current_line}"] = str(sql_saver.PersonnType.get_by(id=personn.type).value).strip()
+            active_page[f"{xl_col_to_name(col_number + 2)}{current_line}"] = str(personn.appelido_paterno + " " + personn.appelido_materno).strip()
+            active_page[f"{xl_col_to_name(col_number + 3)}{current_line}"] = str(personn.nombres).strip()
         
         current_line += 1
         record_tuple = cursor.fetchone()

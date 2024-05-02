@@ -5,6 +5,7 @@ from fastapi import FastAPI, Response # the high-level server part
 import scraper, requester # the link to the data being scraped
 import json, uvicorn, threading # the low-level server part
 import os, platform, traceback, signal, asyncio # to stop the script
+import socket
 
 try:
     from ..build_logger import get_logger
@@ -15,7 +16,6 @@ logger = get_logger(__name__)
 
 app = FastAPI()
 SERVER_THREAD = None
-PORT = 5446
 api_initialized_time = datetime.now()
 api_started_time = None
 MAIN_TASK = None
@@ -36,6 +36,11 @@ class CancelableThread(threading.Thread):
         self.canceled.set()
     def reset(self):
         self.canceled.clear()
+
+def get_free_port() -> int:
+    sock = socket.socket()
+    sock.bind(("", 0))
+    return sock.getsockname()[1]
 
 def get_json():
     DATA = {}
@@ -108,7 +113,10 @@ def start():
     global api_started_time
     global SERVER_THREAD
     api_started_time = datetime.now()
-    thread = CancelableThread(None, uvicorn.run, kwargs={"app": __name__+":app", "host": "0.0.0.0", "port": PORT})
+    port = get_free_port()
+    print("Starting server on port " + str(port))
+    print(f"access to api on http://127.0.0.1:{port} or using ' curl http://127.0.0.1:{port} '")
+    thread = CancelableThread(None, uvicorn.run, kwargs={"app": __name__+":app", "host": "0.0.0.0", "port": port})
     thread.start()
     SERVER_THREAD = thread
     logger.info("SERVER_THREAD : " + str(thread.getName()))

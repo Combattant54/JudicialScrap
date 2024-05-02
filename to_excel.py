@@ -8,6 +8,7 @@ from datetime import date
 import json
 import asyncio
 import sys
+import threading
 
 from letters_ops import num_to_letters
 from xlsxwriter.utility import xl_col_to_name
@@ -121,7 +122,7 @@ print(SPECIALIZED)
 
 active_saver = None
 
-async def init(path, save_dir, saver: sql_saver.SQLSaver =None):
+def init(path, save_dir):
     global DB_PATH
     global TARGET_PATH
     global SAVE_DIR
@@ -138,13 +139,6 @@ async def init(path, save_dir, saver: sql_saver.SQLSaver =None):
         os.makedirs(SAVE_DIR)
     logger.info(DB_PATH)
     logger.info(TARGET_PATH)
-    
-    if saver is None:
-        folder, filename = os.path.split(DB_PATH)
-        active_saver = sql_saver.SQLSaver(filename, folder)
-        await active_saver.create_tables()
-    else:
-        active_saver = saver
 
 def fill_0(number, number_of_zeros):
     string = str(number)
@@ -183,15 +177,59 @@ ORDER BY n_expediente ASC
 async def load_saver(db_filename) -> sql_saver.SQLSaver:
     folder, filename = os.path.split(DB_PATH)
     active_saver = sql_saver.SQLSaver(db_filename, folder)
-    with sql_saver.DBLock:
+    with active_saver.DBLock:
         await active_saver.create_tables()
 
-def initialize():
+async def year_to_excel(year, district_arg:str ="", instance_arg: str ="", specialized_arg: str =""):
+    saver = await load_saver(f"db_{year}.db")
+    initialize(saver)
+    
+    if district_arg == "ALL" or district_arg == "":
+        districts = list(map(lambda x: x.id, saver.Districts.get_all()))
+    elif "-" in district_arg:
+        districts = range(*map(lambda x: saver.Districts.get_by(name=x.upper()).id, district_arg.split("-")))
+        districts.stop += 1
+        districts = list(districts)
+    elif ";" in district_arg:
+        districts = list(map(lambda x: saver.Districts.get_by(name=x.upper()).id, district_arg.split(";")))
+    else:
+        districts = [saver.Districts.get_by(name=district_arg).id]
+        
+    
+    if instance_arg == "ALL" or instance_arg == "":
+        instances = list(map(lambda x: x.id, saver.Instances.get_all()))
+    elif "-" in instance_arg:
+        instances = range(*map(lambda x: saver.Instances.get_by(name=x.upper()).id, instance_arg.split("-")))
+        instances.stop += 1
+        instances = list(instances)
+    elif ";" in instance_arg:
+        instances = list(map(lambda x: saver.Instances.get_by(name=x.upper()).id, instance_arg.split(";")))
+    else:
+        instances = [saver.Instances.get_by(name=instance_arg).id]
+        
+    if specialized_arg == "ALL" or specialized_arg == "":
+        specialized = list(map(lambda x: x.id, saver.Specialized.get_all()))
+    elif "-" in specialized_arg:
+        specialized = range(*map(lambda x: saver.Specialized.get_by(name=x.upper()).id, specialized_arg.split("-")))
+        specialized.stop += 1
+        specialized = list(specialized)
+    elif ";" in specialized_arg:
+        specialized = list(map(lambda x: saver.Specialized.get_by(name=x.upper()).id, specialized_arg.split(";")))
+    else:
+        specialized = [saver.Specialized.get_by(name=specialized_arg).id]
+        
+    for district_id in districts:
+        for instance_id in instances:
+            for specialized_id in specialized:
+                to_excel(saver, year, district_id, instance_id, specialized_id)
+                
+
+def initialize(saver: sql_saver.SQLSaver) -> None:
     print("initalization")
-    demandados_id = sql_saver.Partes.get_by(name="DEMANDADO").id
+    demandados_id = saver.Partes.get_by(name="DEMANDADO").id
     demandados_al = []
     for aliase in demandados_aliases:
-        partes =  sql_saver.Partes.get_by(name=aliase)
+        partes =  saver.Partes.get_by(name=aliase)
         demandados_al.append(partes.id)
     params = {demandados_id: tuple(demandados_al)}
     print(params)
@@ -203,7 +241,7 @@ def initialize():
             [k]
         )
 
-def to_excel(year, district_id, instance_id, specialized_id, save_path):
+def to_excel(saver:sql_saver.SQLSaver, year, district_id, instance_id, specialized_id):
     print(year, district_id, instance_id, specialized_id)
     
     wb = Workbook()
@@ -217,12 +255,12 @@ def to_excel(year, district_id, instance_id, specialized_id, save_path):
     print(col_offset)
     
     current_line += 1
-    cursor = active_saver.db.execute(get_all_query, (year, district_id, instance_id, specialized_id))
+    cursor = saver.db.execute(get_all_query, (year, district_id, instance_id, specialized_id))
     record_tuple = cursor.fetchone()
     print("first_fetched")
     while record_tuple:
-        record = sql_saver.Records.get_by(id=record_tuple[0])
-        assert isinstance(record, sql_saver.Records)
+        record = saver.Records.get_by(id=record_tuple[0])
+        assert isinstance(record, saver.Records)
         
         #saut de ligne a chaque n_expediente
         # if last_n_expediente != record.n_expediente:
@@ -241,53 +279,53 @@ def to_excel(year, district_id, instance_id, specialized_id, save_path):
         fecha_ignicio = record.fecha_ignicio
         descargar = record.descargar == 1
         
-        district = sql_saver.Districts.get_by(id=record.district_id)
+        district = saver.Districts.get_by(id=record.district_id)
         active_page[f"A{current_line}"] = str(district.name).capitalize()
         
-        instance = sql_saver.Instances.get_by(id=record.instance_id)
+        instance = saver.Instances.get_by(id=record.instance_id)
         active_page[f"B{current_line}"] = str(instance.name).capitalize()
         
-        specialized = sql_saver.Specialized.get_by(id=record.specialized_id)
+        specialized = saver.Specialized.get_by(id=record.specialized_id)
         active_page[f"C{current_line}"] = str(specialized.name).capitalize()
         
         active_page[f"D{current_line}"] = year
         active_page[f"E{current_line}"] = int(n_expediente)
         active_page[f"F{current_line}"] = trial_ID
         
-        juzgado = sql_saver.Juzgado.get_by(id=record.juzgado_id)
+        juzgado = saver.Juzgado.get_by(id=record.juzgado_id)
         juzgado_val = str(juzgado.value)
         # if juzgado_val.startswith("1º"):
         #     juzgado_val = juzgado_val[len("1º"):]
         # juzgado_val = juzgado_val.strip()
         active_page[f"G{current_line}"] = juzgado_val
         
-        juez = sql_saver.Personns.get_by(id=record.juez_id)
+        juez = saver.Personns.get_by(id=record.juez_id)
         active_page[f"H{current_line}"] = juez.name
         
         active_page[f"I{current_line}"] = fecha_ignicio
         
-        conclusion = sql_saver.Fecha_conclusion.get_by(id=record.conclusion_id)
+        conclusion = saver.Fecha_conclusion.get_by(id=record.conclusion_id)
         active_page[f"J{current_line}"] = conclusion.value
         
-        materias = sql_saver.Materias.get_by(id=record.materias_id)
+        materias = saver.Materias.get_by(id=record.materias_id)
         active_page[f"K{current_line}"] = materias.value
         
-        summilla = sql_saver.Summilla.get_by(id=record.summilla_id)
+        summilla = saver.Summilla.get_by(id=record.summilla_id)
         active_page[f"L{current_line}"] = summilla.value
         
-        especialista_legal = sql_saver.Personns.get_by(id=record.especialista_legal_id)
+        especialista_legal = saver.Personns.get_by(id=record.especialista_legal_id)
         active_page[f"M{current_line}"] = especialista_legal.name
         
-        proceso = sql_saver.Proceso.get_by(id=record.proceso_id)
+        proceso = saver.Proceso.get_by(id=record.proceso_id)
         active_page[f"N{current_line}"] = proceso.value
         
-        estado = sql_saver.Estado.get_by(id=record.estado_id)
+        estado = saver.Estado.get_by(id=record.estado_id)
         active_page[f"O{current_line}"] = estado.value
         
         active_page[f"P{current_line}"] = 1 if descargar else 0
         
         # récupère les personnes
-        personns_records = sql_saver.PersonnRecord.get_all(record_id=record.id)
+        personns_records = saver.PersonnRecord.get_all(record_id=record.id)
         personns_records.sort(key = lambda pers: pers.partes_id)
         if current_line % 500 == 0:
             print("starting getting personnes on line " + str(current_line))
@@ -297,47 +335,37 @@ def to_excel(year, district_id, instance_id, specialized_id, save_path):
             partes = sql_saver.Partes.get_by(id=personn_record.partes_id)
             personn = sql_saver.Personns.get_by(id=personn_record.personn_id)
             active_page[f"{xl_col_to_name(col_number + 0)}{current_line}"] = str(partes.name).strip()
-            active_page[f"{xl_col_to_name(col_number + 1)}{current_line}"] = str(sql_saver.PersonnType.get_by(id=personn.type).value).strip()
+            active_page[f"{xl_col_to_name(col_number + 1)}{current_line}"] = str(saver.PersonnType.get_by(id=personn.type).value).strip()
             active_page[f"{xl_col_to_name(col_number + 2)}{current_line}"] = str(personn.appelido_paterno + " " + personn.appelido_materno).strip()
             active_page[f"{xl_col_to_name(col_number + 3)}{current_line}"] = str(personn.nombres).strip()
         
         current_line += 1
         record_tuple = cursor.fetchone()
     
+    district_name = saver.Districts.get_by(id=district_id)
+    instance_name = saver.Instances.get_by(id=instance_id)
+    specialized_name = saver.Specialized.get_by(id=specialized_id)
+    save_path = get_file_path(year, district_name, instance_name, specialized_name)
     wb.save(save_path)
     wb.close()
     print("file saved at " + save_path)
 
-async def main(db_path, save_dir, year, district, instance, specialized):
-    await init(db_path, save_dir)
-    initialize()
-    if isinstance(district, int):
-        district_name = sql_saver.Districts.get_by(id=district).name
-        district_id = district
-    else:
-        district_name = district.lower()
-        district_id = sql_saver.Districts.get_by(name=district).id
+def main(db_path, save_dir, year, district, instance, specialized):
+    init(db_path, save_dir)
     
-    if isinstance(instance, int):
-        instance_name = sql_saver.Instances.get_by(id=instance).name
-        instance_id = instance
+    years = []
+    if "-" in year:
+        years = range(*map(int, year.split("-")))
+    elif ";" in year:
+        years = map(int, year.split(";"))
     else:
-        instance_name = instance.lower()
-        instance_id = sql_saver.Instances.get_by(name=instance).id
-        
-    if isinstance(specialized, int):
-        specialized_name = sql_saver.Specialized.get_by(id=specialized).name
-        specialized_id = specialized
-    else:
-        specialized_name = specialized.lower()
-        specialized_id = sql_saver.Specialized.get_by(name=specialized).id
+        years = [int(year)]
     
-    print(district_id, district_name)
-    
-    path = get_file_path(year, district_name, instance_name, specialized_name)
-    async with sql_saver.DBLock:
-        to_excel(year, district_id, instance_id, specialized_id, path)
-
+    threads = []
+    for year in years:
+        t = threading.Thread(target=asyncio.run, args=(year_to_excel(year, district_id, instance_id, specialized_id)))
+        t.start()
+        threads.append(t)
 
 if __name__ == "__main__":
     args = sys.argv[1:]
@@ -346,7 +374,7 @@ if __name__ == "__main__":
     instance_id = int(args[2])
     specialized_id = int(args[3])
     
-    db_path = "result/db_2018.db"
+    db_path = "result/db_{}.db"
     save_dir = "result/DATA/excel files"
-    asyncio.run(main(db_path, save_dir, *map(int, args)))
+    main(db_path, save_dir, args)
     

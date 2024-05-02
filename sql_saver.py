@@ -18,191 +18,6 @@ import build_logger
 logger = build_logger.get_logger(__name__)
 
 PARTES = set()
-DBLock = asyncio.Lock()
-
-
-class Districts(db.DBTable):
-    @classmethod
-    def create(cls):
-        Districts.add_row(rows.DBRow.build_id_row())
-        Districts.add_row(rows.DBRow("value", TEXT(10), unique=True))
-        Districts.add_row(rows.DBRow("name", TEXT(45), unique=True))
-
-class Instances(db.DBTable):
-    @classmethod
-    def create(cls):
-        Instances.add_row(rows.DBRow.build_id_row())
-        Instances.add_row(rows.DBRow("value", TEXT(10), unique=True))
-        Instances.add_row(rows.DBRow("name", TEXT(45), unique=True))
-
-class Specialized(db.DBTable):
-    @classmethod
-    def create(cls):
-        Specialized.add_row(rows.DBRow.build_id_row())
-        Specialized.add_row(rows.DBRow("value", TEXT(10), unique=True))
-        Specialized.add_row(rows.DBRow("name", TEXT(75), unique=True))
-
-class SpecializedRecords(db.DBTable):
-    @classmethod
-    def create(cls):
-        SpecializedRecords.add_row(rows.DBRow.build_id_row())
-        SpecializedRecords.add_row(rows.DBRow("district", INTEGER, foreign_key=Districts.get_row("id")))
-        SpecializedRecords.add_row(rows.DBRow("Specialized", INTEGER, foreign_key=Specialized.get_row("id")))
-        SpecializedRecords.add_row(rows.DBRow("value", INTEGER))
-
-class Juzgado(db.DBTable):
-    @classmethod
-    def create(cls):
-        Juzgado.add_row(rows.DBRow.build_id_row())
-        Juzgado.add_row(rows.DBRow("value", TEXT(80), unique=True))
-
-class PersonnType(db.DBTable):
-    @classmethod
-    def create(cls):
-        PersonnType.add_row(rows.DBRow.build_id_row())
-        PersonnType.add_row(rows.DBRow("value", TEXT(50), unique=True))
-
-class Personns(db.DBTable):
-    @classmethod
-    def create(cls):
-        Personns.add_row(rows.DBRow.build_id_row())
-        Personns.add_row(rows.DBRow("name", TEXT(300), unique=True))
-        Personns.add_row(rows.DBRow("nombres", TEXT(70), nullable=True, default=None))
-        Personns.add_row(rows.DBRow("appelido_paterno", TEXT(100), nullable=True, default=None))
-        Personns.add_row(rows.DBRow("appelido_materno", TEXT(100), nullable=True, default=None))
-        Personns.add_row(rows.DBRow("type", INTEGER, foreign_key=PersonnType.get_row("id"), nullable=True, default=None))
-
-class Proceso(db.DBTable):
-    @classmethod
-    def create(cls):
-        Proceso.add_row(rows.DBRow.build_id_row())
-        Proceso.add_row(rows.DBRow("value", TEXT(30), unique=True))
-
-class Estado(db.DBTable):
-    @classmethod
-    def create(cls):
-        Estado.add_row(rows.DBRow.build_id_row())
-        Estado.add_row(rows.DBRow("value", TEXT(60), unique=True))
-
-class Materias(db.DBTable):
-    @classmethod
-    def create(cls):
-        Materias.add_row(rows.DBRow.build_id_row())
-        Materias.add_row(rows.DBRow("value", TEXT(75), unique=True))
-
-class Summilla(db.DBTable):
-    @classmethod
-    def create(cls):
-        Summilla.add_row(rows.DBRow.build_id_row())
-        Summilla.add_row(rows.DBRow("value", TEXT(250), unique=True))
-        
-class Fecha_conclusion(db.DBTable):
-    @classmethod
-    def create(cls):
-        Fecha_conclusion.add_row(rows.DBRow.build_id_row())
-        Fecha_conclusion.add_row(rows.DBRow("value", TEXT(250), unique=True))
-
-class Partes(db.DBTable):
-    @classmethod
-    def create(cls):
-        Partes.add_row(rows.DBRow.build_id_row())
-        Partes.add_row(rows.DBRow("name", TEXT(40), unique=True))
-
-
-class Records(db.DBTable):
-    @classmethod
-    def get_string(cls, *args, **kwargs):
-        return records_create_command
-    
-    @classmethod
-    def create(cls):
-        Records.add_row(rows.DBRow.build_id_row())
-        Records.add_row(rows.DBRow("n_expediente", INTEGER, primary=True))
-        Records.add_row(rows.DBRow("year", "smallint", primary=True))
-        Records.add_row(rows.DBRow("digit_1", "tinyint", primary=True))
-        Records.add_row(rows.DBRow("digit_2", "smallint", primary=True))
-        Records.add_row(rows.DBRow("instance_code", TEXT(2), primary=True))
-        Records.add_row(rows.DBRow("specialized_code", TEXT(2), primary=True))
-        Records.add_row(rows.DBRow("last_digit", "tyniint", primary=True))
-        Records.add_row(rows.DBRow("fecha_ignicio", DATE, nullable=False, primary=True))
-        Records.add_row(rows.DBRow("descargar", BIT(1), default=0, primary=True))
-        
-        Records.add_row(rows.DBRow("district_id", INTEGER, foreign_key=Districts.get_row("id")))
-        Records.add_row(rows.DBRow("instance_id", INTEGER, foreign_key=Instances.get_row("id")))
-        Records.add_row(rows.DBRow("specialized_id", INTEGER, foreign_key=Specialized.get_row("id")))
-        Records.add_row(rows.DBRow("juzgado_id", INTEGER, foreign_key=Juzgado.get_row("id")))
-        Records.add_row(rows.DBRow("juez_id", INTEGER, nullable=False, foreign_key=Personns.get_row("id")))
-        Records.add_row(rows.DBRow("conclusion_id", INTEGER, nullable=True, foreign_key=Fecha_conclusion.get_row("id")))
-        Records.add_row(rows.DBRow("materias_id", INTEGER, nullable=True, foreign_key=Materias.get_row("id")))
-        Records.add_row(rows.DBRow("summilla_id", INTEGER, nullable=True, foreign_key=Summilla.get_row("id")))
-        Records.add_row(rows.DBRow("especialista_legal_id", INTEGER, nullable=False, foreign_key=Personns.get_row("id")))
-        Records.add_row(rows.DBRow("estado_id", INTEGER, nullable=True, foreign_key=Estado.get_row("id")))
-        Records.add_row(rows.DBRow("proceso_id", INTEGER, nullable=True, foreign_key=Proceso.get_row("id")))
-        # Records.add_row(rows.DBRow("demando_id", INTEGER, nullable=True, foreign_key=Personns.get_row("id")))
-        # Records.add_row(rows.DBRow("demandante_id", INTEGER, nullable=True, foreign_key=Personns.get_row("id")))
-        # Records.add_row(rows.DBRow("agraviado_id", INTEGER, nullable=True, foreign_key=Personns.get_row("id")))
-        
-class PersonnRecord(db.DBTable):
-    @classmethod
-    def create(cls):
-        PersonnRecord.add_row(rows.DBRow.build_id_row())
-        PersonnRecord.add_row(rows.DBRow("personn_id", INTEGER, foreign_key=Personns.get_row("id")))
-        PersonnRecord.add_row(rows.DBRow("record_id", INTEGER, foreign_key=Records.get_row("id")))
-        PersonnRecord.add_row(rows.DBRow("partes_id", INTEGER, foreign_key=Partes.get_row("id")))
-
-class ScrapedPages(db.DBTable):
-    @classmethod
-    def create(cls):
-        ScrapedPages.add_row(rows.DBRow.build_id_row())
-        ScrapedPages.add_row(rows.DBRow("year", INTEGER, default=2000, primary=True))
-        ScrapedPages.add_row(rows.DBRow("district_id", INTEGER, foreign_key=Districts.get_row("id"), primary=True))
-        ScrapedPages.add_row(rows.DBRow("instance_id", INTEGER, foreign_key=Instances.get_row("id"), primary=True))
-        ScrapedPages.add_row(rows.DBRow("specialized_id", INTEGER, foreign_key=Specialized.get_row("id"), primary=True))
-        ScrapedPages.add_row(rows.DBRow("n_expediente", INTEGER))
-        ScrapedPages.add_row(rows.DBRow("is_saved", BOOLEAN, default=0))
-        ScrapedPages.add_row(rows.DBRow("status", BOOLEAN, default=1))
-        ScrapedPages.add_row(rows.DBRow("downloads", BOOLEAN, default=0))
-    
-    def build_update(self, is_saved=False, status=True, downloads=True):
-        data = {
-            "year": self.year,
-            "n_expediente": self.n_expediente
-        }
-        if isinstance(self.district_id, Districts):
-            data.update({
-                "district_id": self.district_id.id,
-                "instance_id": self.instance_id.id,
-                "specialized_id": self.specialized.id,
-            })
-        msg = "UPDATE scrapedpages "
-        msg += "SET is_saved = ?, status = ?, downloads = ? "
-        msg += f"WHERE ({' AND '.join([f'{name} = ?' for name in data.keys()])})"
-        
-        args = [
-            1 if is_saved else 0,
-            1 if status else 0,
-            1 if downloads else 0,
-            *data.values()
-        ]
-        
-        return msg, args
-    
-    @staticmethod
-    def build_create(
-            **kwargs
-        ):
-        #kwargs["id"] = "SELECT IFNULL(MAX(id) + 1, 0) FROM scrapedpages"
-        kwargs["is_saved"] = 1 if kwargs.get("is_saved", False) else 0
-        kwargs["status"] = 1 if kwargs.get("status", True) else 0
-        kwargs["downloads"] = 1 if kwargs.get("downloads", True) else 0
-        
-        val = [" ( SELECT IFNULL(MAX(id) + 1, 0) FROM scrapedpages ) "]
-        val.extend(['?'] * len(kwargs))
-        msg = f"INSERT INTO scrapedpages ({', '.join(['id'] + list(kwargs.keys()))}) "
-        msg += f"VALUES ({', '.join(val)})"
-        
-        
-        return msg, list(kwargs.values())
 
 class Trial(db.DBTable):
     pass
@@ -226,8 +41,207 @@ class SQLSaver(Saver):
         self.name = name
         self.path = os.path.join(self.db_folder, self.name)
         print(self.path)
+        self.DBLock = asyncio.Lock()
         self.db = db.DB(path=self.path, debug=debug)
         self.debug = debug
+        
+        class Districts(db.DBTable):
+            @classmethod
+            def create(cls):
+                Districts.add_row(rows.DBRow.build_id_row())
+                Districts.add_row(rows.DBRow("value", TEXT(10), unique=True))
+                Districts.add_row(rows.DBRow("name", TEXT(45), unique=True))
+        self.Districts = Districts
+
+        class Instances(db.DBTable):
+            @classmethod
+            def create(cls):
+                Instances.add_row(rows.DBRow.build_id_row())
+                Instances.add_row(rows.DBRow("value", TEXT(10), unique=True))
+                Instances.add_row(rows.DBRow("name", TEXT(45), unique=True))
+        self.Instances = Instances
+        
+        class Specialized(db.DBTable):
+            @classmethod
+            def create(cls):
+                Specialized.add_row(rows.DBRow.build_id_row())
+                Specialized.add_row(rows.DBRow("value", TEXT(10), unique=True))
+                Specialized.add_row(rows.DBRow("name", TEXT(75), unique=True))
+        self.Specialized = Specialized
+        
+        class SpecializedRecords(db.DBTable):
+            @classmethod
+            def create(cls):
+                SpecializedRecords.add_row(rows.DBRow.build_id_row())
+                SpecializedRecords.add_row(rows.DBRow("district", INTEGER, foreign_key=Districts.get_row("id")))
+                SpecializedRecords.add_row(rows.DBRow("Specialized", INTEGER, foreign_key=Specialized.get_row("id")))
+                SpecializedRecords.add_row(rows.DBRow("value", INTEGER))
+        self.SpecializedRecords = SpecializedRecords
+        
+        class Juzgado(db.DBTable):
+            @classmethod
+            def create(cls):
+                Juzgado.add_row(rows.DBRow.build_id_row())
+                Juzgado.add_row(rows.DBRow("value", TEXT(80), unique=True))
+        self.Juzgado = Juzgado
+        
+        class PersonnType(db.DBTable):
+            @classmethod
+            def create(cls):
+                PersonnType.add_row(rows.DBRow.build_id_row())
+                PersonnType.add_row(rows.DBRow("value", TEXT(50), unique=True))
+        self.PersonnType = PersonnType
+        
+        class Personns(db.DBTable):
+            @classmethod
+            def create(cls):
+                Personns.add_row(rows.DBRow.build_id_row())
+                Personns.add_row(rows.DBRow("name", TEXT(300), unique=True))
+                Personns.add_row(rows.DBRow("nombres", TEXT(70), nullable=True, default=None))
+                Personns.add_row(rows.DBRow("appelido_paterno", TEXT(100), nullable=True, default=None))
+                Personns.add_row(rows.DBRow("appelido_materno", TEXT(100), nullable=True, default=None))
+                Personns.add_row(rows.DBRow("type", INTEGER, foreign_key=PersonnType.get_row("id"), nullable=True, default=None))
+        self.Personns = Personns
+        
+        class Proceso(db.DBTable):
+            @classmethod
+            def create(cls):
+                Proceso.add_row(rows.DBRow.build_id_row())
+                Proceso.add_row(rows.DBRow("value", TEXT(30), unique=True))
+        self.Proceso = Proceso
+        
+        class Estado(db.DBTable):
+            @classmethod
+            def create(cls):
+                Estado.add_row(rows.DBRow.build_id_row())
+                Estado.add_row(rows.DBRow("value", TEXT(60), unique=True))
+        self.Estado = Estado
+        
+        class Materias(db.DBTable):
+            @classmethod
+            def create(cls):
+                Materias.add_row(rows.DBRow.build_id_row())
+                Materias.add_row(rows.DBRow("value", TEXT(75), unique=True))
+        self.Materias = Materias
+        
+        class Summilla(db.DBTable):
+            @classmethod
+            def create(cls):
+                Summilla.add_row(rows.DBRow.build_id_row())
+                Summilla.add_row(rows.DBRow("value", TEXT(250), unique=True))
+        self.Summilla = Summilla
+                
+        class Fecha_conclusion(db.DBTable):
+            @classmethod
+            def create(cls):
+                Fecha_conclusion.add_row(rows.DBRow.build_id_row())
+                Fecha_conclusion.add_row(rows.DBRow("value", TEXT(250), unique=True))
+        self.Fecha_conclusion = Fecha_conclusion
+        
+        class Partes(db.DBTable):
+            @classmethod
+            def create(cls):
+                Partes.add_row(rows.DBRow.build_id_row())
+                Partes.add_row(rows.DBRow("name", TEXT(40), unique=True))
+        self.Partes = Partes
+
+        class Records(db.DBTable):
+            @classmethod
+            def get_string(cls, *args, **kwargs):
+                return records_create_command
+            
+            @classmethod
+            def create(cls):
+                Records.add_row(rows.DBRow.build_id_row())
+                Records.add_row(rows.DBRow("n_expediente", INTEGER, primary=True))
+                Records.add_row(rows.DBRow("year", "smallint", primary=True))
+                Records.add_row(rows.DBRow("digit_1", "tinyint", primary=True))
+                Records.add_row(rows.DBRow("digit_2", "smallint", primary=True))
+                Records.add_row(rows.DBRow("instance_code", TEXT(2), primary=True))
+                Records.add_row(rows.DBRow("specialized_code", TEXT(2), primary=True))
+                Records.add_row(rows.DBRow("last_digit", "tyniint", primary=True))
+                Records.add_row(rows.DBRow("fecha_ignicio", DATE, nullable=False, primary=True))
+                Records.add_row(rows.DBRow("descargar", BIT(1), default=0, primary=True))
+                
+                Records.add_row(rows.DBRow("district_id", INTEGER, foreign_key=Districts.get_row("id")))
+                Records.add_row(rows.DBRow("instance_id", INTEGER, foreign_key=Instances.get_row("id")))
+                Records.add_row(rows.DBRow("specialized_id", INTEGER, foreign_key=Specialized.get_row("id")))
+                Records.add_row(rows.DBRow("juzgado_id", INTEGER, foreign_key=Juzgado.get_row("id")))
+                Records.add_row(rows.DBRow("juez_id", INTEGER, nullable=False, foreign_key=Personns.get_row("id")))
+                Records.add_row(rows.DBRow("conclusion_id", INTEGER, nullable=True, foreign_key=Fecha_conclusion.get_row("id")))
+                Records.add_row(rows.DBRow("materias_id", INTEGER, nullable=True, foreign_key=Materias.get_row("id")))
+                Records.add_row(rows.DBRow("summilla_id", INTEGER, nullable=True, foreign_key=Summilla.get_row("id")))
+                Records.add_row(rows.DBRow("especialista_legal_id", INTEGER, nullable=False, foreign_key=Personns.get_row("id")))
+                Records.add_row(rows.DBRow("estado_id", INTEGER, nullable=True, foreign_key=Estado.get_row("id")))
+                Records.add_row(rows.DBRow("proceso_id", INTEGER, nullable=True, foreign_key=Proceso.get_row("id")))
+                # Records.add_row(rows.DBRow("demando_id", INTEGER, nullable=True, foreign_key=Personns.get_row("id")))
+                # Records.add_row(rows.DBRow("demandante_id", INTEGER, nullable=True, foreign_key=Personns.get_row("id")))
+                # Records.add_row(rows.DBRow("agraviado_id", INTEGER, nullable=True, foreign_key=Personns.get_row("id")))
+        self.Records = Records
+        
+        class PersonnRecord(db.DBTable):
+            @classmethod
+            def create(cls):
+                PersonnRecord.add_row(rows.DBRow.build_id_row())
+                PersonnRecord.add_row(rows.DBRow("personn_id", INTEGER, foreign_key=Personns.get_row("id")))
+                PersonnRecord.add_row(rows.DBRow("record_id", INTEGER, foreign_key=Records.get_row("id")))
+                PersonnRecord.add_row(rows.DBRow("partes_id", INTEGER, foreign_key=Partes.get_row("id")))
+        self.PersonnRecord = PersonnRecord
+        
+        class ScrapedPages(db.DBTable):
+            @classmethod
+            def create(cls):
+                ScrapedPages.add_row(rows.DBRow.build_id_row())
+                ScrapedPages.add_row(rows.DBRow("year", INTEGER, default=2000, primary=True))
+                ScrapedPages.add_row(rows.DBRow("district_id", INTEGER, foreign_key=Districts.get_row("id"), primary=True))
+                ScrapedPages.add_row(rows.DBRow("instance_id", INTEGER, foreign_key=Instances.get_row("id"), primary=True))
+                ScrapedPages.add_row(rows.DBRow("specialized_id", INTEGER, foreign_key=Specialized.get_row("id"), primary=True))
+                ScrapedPages.add_row(rows.DBRow("n_expediente", INTEGER))
+                ScrapedPages.add_row(rows.DBRow("is_saved", BOOLEAN, default=0))
+                ScrapedPages.add_row(rows.DBRow("status", BOOLEAN, default=1))
+                ScrapedPages.add_row(rows.DBRow("downloads", BOOLEAN, default=0))
+            
+            def build_update(self, is_saved=False, status=True, downloads=True):
+                data = {
+                    "year": self.year,
+                    "n_expediente": self.n_expediente
+                }
+                if isinstance(self.district_id, Districts):
+                    data.update({
+                        "district_id": self.district_id.id,
+                        "instance_id": self.instance_id.id,
+                        "specialized_id": self.specialized.id,
+                    })
+                msg = "UPDATE scrapedpages "
+                msg += "SET is_saved = ?, status = ?, downloads = ? "
+                msg += f"WHERE ({' AND '.join([f'{name} = ?' for name in data.keys()])})"
+                
+                args = [
+                    1 if is_saved else 0,
+                    1 if status else 0,
+                    1 if downloads else 0,
+                    *data.values()
+                ]
+                
+                return msg, args
+            
+            @staticmethod
+            def build_create(
+                    **kwargs
+                ):
+                #kwargs["id"] = "SELECT IFNULL(MAX(id) + 1, 0) FROM scrapedpages"
+                kwargs["is_saved"] = 1 if kwargs.get("is_saved", False) else 0
+                kwargs["status"] = 1 if kwargs.get("status", True) else 0
+                kwargs["downloads"] = 1 if kwargs.get("downloads", True) else 0
+                
+                val = [" ( SELECT IFNULL(MAX(id) + 1, 0) FROM scrapedpages ) "]
+                val.extend(['?'] * len(kwargs))
+                msg = f"INSERT INTO scrapedpages ({', '.join(['id'] + list(kwargs.keys()))}) "
+                msg += f"VALUES ({', '.join(val)})"
+                
+                
+                return msg, list(kwargs.values())
+        self.ScrapedPages = ScrapedPages
         
     def get_int_from_combinaison(self, specialized_map: typing.Dict[int, bool]):
         # Récupère les spécialités
@@ -298,22 +312,22 @@ class SQLSaver(Saver):
         return bool_table
     
     async def create_tables(self):
-        self.db.add_table(Districts)
-        self.db.add_table(Instances)
-        self.db.add_table(Specialized)
-        self.db.add_table(SpecializedRecords)
-        self.db.add_table(Juzgado)
-        self.db.add_table(PersonnType)
-        self.db.add_table(Personns)
-        self.db.add_table(Proceso)
-        self.db.add_table(Estado)
-        self.db.add_table(Materias)
-        self.db.add_table(Summilla)
-        self.db.add_table(Fecha_conclusion)
-        self.db.add_table(Records)
-        self.db.add_table(Partes)
-        self.db.add_table(PersonnRecord)
-        self.db.add_table(ScrapedPages)
+        self.db.add_table(self.Districts)
+        self.db.add_table(self.Instances)
+        self.db.add_table(self.Specialized)
+        self.db.add_table(self.SpecializedRecords)
+        self.db.add_table(self.Juzgado)
+        self.db.add_table(self.PersonnType)
+        self.db.add_table(self.Personns)
+        self.db.add_table(self.Proceso)
+        self.db.add_table(self.Estado)
+        self.db.add_table(self.Materias)
+        self.db.add_table(self.Summilla)
+        self.db.add_table(self.Fecha_conclusion)
+        self.db.add_table(self.Records)
+        self.db.add_table(self.Partes)
+        self.db.add_table(self.PersonnRecord)
+        self.db.add_table(self.ScrapedPages)
         
         # self.db.execute("DROP TABLE scrapedpages")
         
@@ -324,9 +338,9 @@ class SQLSaver(Saver):
         return await self.mark_as_saved(*args, **kwargs, saved=False, status=False)
         
     async def mark_as_saved(self, year, district, instance, specialized, n_expediente, saved=True, status=True, download=True):
-        district_id = Districts.get_by(name=district).id
-        instance_id = Instances.get_by(name=instance).id
-        specialized_id = Specialized.get_by(name=specialized).id
+        district_id = self.Districts.get_by(name=district).id
+        instance_id = self.Instances.get_by(name=instance).id
+        specialized_id = self.Specialized.get_by(name=specialized).id
         
         data = {
             "year": int(year),
@@ -335,9 +349,9 @@ class SQLSaver(Saver):
             "specialized_id": specialized_id,
             "n_expediente": int(n_expediente),
         }
-        page = ScrapedPages.get_by(**data)
+        page = self.ScrapedPages.get_by(**data)
         if page is None:
-            c = self.db.execute(*ScrapedPages.build_create(**data, is_saved=saved, status=status, downloads=download))
+            c = self.db.execute(*self.ScrapedPages.build_create(**data, is_saved=saved, status=status, downloads=download))
             return
         
         msg, args = page.build_update(is_saved=saved, status=status, downloads=download)
@@ -349,15 +363,15 @@ class SQLSaver(Saver):
         
         
     async def is_saved(self, year, district, instance, specialized, n_expediente):
-        district = Districts.get_by(name = district)
+        district = self.Districts.get_by(name = district)
         if district is None:
             return (False, False)
         
-        instance = Instances.get_by(name=instance)
+        instance = self.Instances.get_by(name=instance)
         if instance is None:
             return (False, False)
         
-        specialized = Specialized.get_by(name=specialized)
+        specialized = self.Specialized.get_by(name=specialized)
         if specialized is None:
             return (False, False)
         
@@ -369,7 +383,7 @@ class SQLSaver(Saver):
             "n_expediente": n_expediente
         }
         
-        page = ScrapedPages.get_by(**data)
+        page = self.ScrapedPages.get_by(**data)
         if page is None:
             return (False, False)
         
@@ -379,7 +393,7 @@ class SQLSaver(Saver):
         try:
             n_expediente = int(n_expediente)
             year = int(year)
-            async with DBLock:
+            async with self.DBLock:
                 data = await self.is_saved(year, district, instance, specialized, n_expediente)
         except Exception as e:
             logger.warning("exception : " + str(e))
@@ -428,74 +442,74 @@ class SQLSaver(Saver):
         record_id_string = record_id_string + " / " + record_additional_string
         
         # l'instance
-        instance = Instances.get_by(name=instance_name)
+        instance = self.Instances.get_by(name=instance_name)
         if instance is None:
-            instance = Instances(name=instance_name)
+            instance = self.Instances(name=instance_name)
             instance.create_new()
         instance_id = instance.id
         
         # l'organe de justice
         organo_name = informations["organo"]
         organo_name = str(organo_name.split("°")[-1]).strip()
-        organo = Juzgado.get_by(value=organo_name)
+        organo = self.Juzgado.get_by(value=organo_name)
         if organo is None:
-            organo = Juzgado(value=organo_name)
+            organo = self.Juzgado(value=organo_name)
             organo.create_new()
         organo_id = organo.id
         
         # le district
         district_name = informations["district"]
-        district = Districts.get_by(name=district_name)
+        district = self.Districts.get_by(name=district_name)
         if district is None:
-            district = Districts(name=district_name)
+            district = self.Districts(name=district_name)
             district.create_new()
         district_id = district.id
         
         # le juge
         juez_name = informations["juez"]
-        juez = Personns.get_by(name=juez_name)
+        juez = self.Personns.get_by(name=juez_name)
         if juez is None:
-            juez = Personns(name=juez_name)
+            juez = self.Personns(name=juez_name)
             juez.create_new()
         juez_id = juez.id
         
         # psécialité légale
         legal_specialized_name = informations["legal_specialized"]
-        legal_specialized = Personns.get_by(name=legal_specialized_name)
+        legal_specialized = self.Personns.get_by(name=legal_specialized_name)
         if legal_specialized is None:
-            legal_specialized = Personns(name=legal_specialized_name)
+            legal_specialized = self.Personns(name=legal_specialized_name)
             legal_specialized.create_new()
         legal_specialized_id = legal_specialized.id
         
         # proceso
         proceso_name = informations["proceso"]
-        proceso = Proceso.get_by(value=proceso_name)
+        proceso = self.Proceso.get_by(value=proceso_name)
         if proceso is None:
-            proceso = Proceso(value=proceso_name)
+            proceso = self.Proceso(value=proceso_name)
             proceso.create_new()
         proceso_id = proceso.id
         
         # specialized
         specialized_name = informations["specialized"]
-        specialized = Specialized.get_by(name=specialized_name)
+        specialized = self.Specialized.get_by(name=specialized_name)
         if specialized is None:
-            specialized = Specialized(name=specialized_name)
+            specialized = self.Specialized(name=specialized_name)
             specialized.create_new()
         specialized_id = specialized.id
         
         # le sujet
         materias_name = informations["materials"]
-        materias = Materias.get_by(value=materias_name)
+        materias = self.Materias.get_by(value=materias_name)
         if materias is None:
-            materias = Materias(value=materias_name)
+            materias = self.Materias(value=materias_name)
             materias.create_new()
         materias_id = materias.id
         
         # le status
         status_name = informations["status"]
-        status = Estado.get_by(value=status_name)
+        status = self.Estado.get_by(value=status_name)
         if status is None:
-            status = Estado(value=status_name)
+            status = self.Estado(value=status_name)
             status.create_new()
         status_id = status.id
         
@@ -503,9 +517,9 @@ class SQLSaver(Saver):
         
         # la conclusion
         conclusion_name = informations["fecha_conclusion"]
-        conclusion = Fecha_conclusion.get_by(value=conclusion_name)
+        conclusion = self.Fecha_conclusion.get_by(value=conclusion_name)
         if conclusion is None:
-            conclusion = Fecha_conclusion(value=conclusion_name)
+            conclusion = self.Fecha_conclusion(value=conclusion_name)
             conclusion.create_new()
         conclusion_id = conclusion.id
         
@@ -521,9 +535,9 @@ class SQLSaver(Saver):
         
         # sumilla
         summilla_name = informations["sumilla"]
-        summilla = Summilla.get_by(value=summilla_name)
+        summilla = self.Summilla.get_by(value=summilla_name)
         if summilla is None:
-            summilla = Summilla(value=summilla_name)
+            summilla = self.Summilla(value=summilla_name)
             summilla.create_new()
         summilla_id = summilla.id
         
@@ -551,7 +565,7 @@ class SQLSaver(Saver):
             "descargar": descargar_value
         }
         
-        record = Records.get_by(**datas_dict)
+        record = self.Records.get_by(**datas_dict)
         
         if record is not None:
             # logger.debug(f"record already saved : {record_id_string} not saving a second time")
@@ -559,7 +573,7 @@ class SQLSaver(Saver):
                 f.write(f"{datetime.datetime.now()} - record already saved : {record_id_string} not saving a second time\n")
             return
         
-        record = Records(
+        record = self.Records(
             **datas_dict
         )
         
@@ -590,9 +604,9 @@ class SQLSaver(Saver):
             
             # récupèrz=e le type de la personne
             type_name = personn["tipo de Persona"]
-            personn_type = PersonnType.get_by(value=type_name)
+            personn_type = self.PersonnType.get_by(value=type_name)
             if personn_type is None:
-                personn_type = PersonnType(value=type_name)
+                personn_type = self.PersonnType(value=type_name)
                 personn_type.create_new()
             personn_type_id = personn_type.id
             kwargs["type"] = personn_type_id
@@ -600,9 +614,9 @@ class SQLSaver(Saver):
             assert len(kwargs) > 0
             
             # cré l'objet de la personne
-            personn_object = Personns.get_by(**kwargs)
+            personn_object = self.Personns.get_by(**kwargs)
             if personn_object is None:
-                personn_object = Personns(
+                personn_object = self.Personns(
                     appelido_paterno=personn_paterno, 
                     appelido_materno=personn_materno, 
                     nombres=personn_nombres, 
@@ -612,13 +626,13 @@ class SQLSaver(Saver):
                 personn_object.create_new()
             
             partes_name = personn["parte"]
-            personn_partes = Partes.get_by(name=partes_name)
+            personn_partes = self.Partes.get_by(name=partes_name)
             if personn_partes is None:
-                personn_partes = Partes(name=partes_name)
+                personn_partes = self.Partes(name=partes_name)
                 personn_partes.create_new()
             partes_id = personn_partes.id
             
-            personn_record = PersonnRecord.get_by(
+            personn_record = self.PersonnRecord.get_by(
                 
                 personn_id=personn_object.id, 
                 record_id=record.id, 
@@ -626,7 +640,7 @@ class SQLSaver(Saver):
             )
             
             if personn_record is None:
-                personn_record = PersonnRecord(
+                personn_record = self.PersonnRecord(
                     personn_id=personn_object.id,
                     record_id=record.id,
                     partes_id=partes_id
@@ -639,7 +653,7 @@ class SQLSaver(Saver):
     async def compute_informations(self, informations, district_name, instance_name, specialized_name, all_saved=True):
         # print("computing informations : " + str(len(informations)))
         try:
-            async with DBLock:
+            async with self.DBLock:
                 for info in informations:
                     await self.save_informations(
                         info, 

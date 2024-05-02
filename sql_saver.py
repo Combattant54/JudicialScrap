@@ -10,6 +10,7 @@ from saver import Saver
 import os, logging
 import math
 
+from models import records_create_command
 from sqliteORM import db, rows
 from sqliteORM.types import INTEGER, TEXT, BIT, DATE, BOOLEAN
 import build_logger
@@ -109,6 +110,10 @@ class Partes(db.DBTable):
 
 
 class Records(db.DBTable):
+    @classmethod
+    def get_string(cls, *args, **kwargs):
+        return records_create_command
+    
     @classmethod
     def create(cls):
         Records.add_row(rows.DBRow.build_id_row())
